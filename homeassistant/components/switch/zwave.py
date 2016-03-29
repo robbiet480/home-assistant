@@ -29,18 +29,19 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         return
 
     value.set_change_verified(False)
-    add_devices([ZwaveSwitch(value)])
+    location_in_name = config["zwave"].get("location_in_name")
+    add_devices([ZwaveSwitch(value, location_in_name)])
 
 
 class ZwaveSwitch(ZWaveDeviceEntity, SwitchDevice):
     """Representation of a Z-Wave switch."""
 
-    def __init__(self, value):
+    def __init__(self, value, location_in_name):
         """Initialize the Z-Wave switch device."""
         from openzwave.network import ZWaveNetwork
         from pydispatch import dispatcher
 
-        ZWaveDeviceEntity.__init__(self, value, DOMAIN)
+        ZWaveDeviceEntity.__init__(self, value, DOMAIN, location_in_name)
 
         self._state = value.data
         dispatcher.connect(

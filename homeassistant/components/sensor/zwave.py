@@ -61,27 +61,30 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             if DEVICE_MAPPINGS[specific_sensor_key] == WORKAROUND_IGNORE:
                 return
 
+    location_in_name = config["zwave"].get("location_in_name")
+
     # Generic Device mappings
     if value.command_class == COMMAND_CLASS_SENSOR_MULTILEVEL:
-        add_devices([ZWaveMultilevelSensor(value)])
+        add_devices([ZWaveMultilevelSensor(value, location_in_name)])
 
     elif (value.command_class == COMMAND_CLASS_METER and
           value.type == TYPE_DECIMAL):
-        add_devices([ZWaveMultilevelSensor(value)])
+        add_devices([ZWaveMultilevelSensor(value, location_in_name)])
 
     elif value.command_class == COMMAND_CLASS_ALARM:
-        add_devices([ZWaveAlarmSensor(value)])
+        add_devices([ZWaveAlarmSensor(value, location_in_name)])
 
 
 class ZWaveSensor(ZWaveDeviceEntity, Entity):
     """Representation of a Z-Wave sensor."""
 
-    def __init__(self, sensor_value):
+    def __init__(self, sensor_value, location_in_name=False):
         """Initialize the sensor."""
         from openzwave.network import ZWaveNetwork
         from pydispatch import dispatcher
 
-        ZWaveDeviceEntity.__init__(self, sensor_value, DOMAIN)
+        ZWaveDeviceEntity.__init__(self, sensor_value, DOMAIN,
+                                   location_in_name)
 
         dispatcher.connect(
             self.value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)

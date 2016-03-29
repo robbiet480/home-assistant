@@ -43,6 +43,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     value = node.values[discovery_info[ATTR_VALUE_ID]]
     value.set_change_verified(False)
 
+    location_in_name = config["zwave"].get("location_in_name")
+
     # Make sure that we have values for the key before converting to int
     if (value.node.manufacturer_id.strip() and
             value.node.product_id.strip()):
@@ -56,25 +58,26 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
                 re_arm_multiplier = (get_config_value(value.node, 9) or 4)
                 add_devices([
                     ZWaveTriggerSensor(value, "motion",
-                                       hass, re_arm_multiplier * 8)
+                                       hass, re_arm_multiplier * 8,
+                                       location_in_name)
                 ])
                 return
 
     if value.command_class == COMMAND_CLASS_SENSOR_BINARY:
-        add_devices([ZWaveBinarySensor(value, None)])
+        add_devices([ZWaveBinarySensor(value, None, location_in_name)])
 
 
 class ZWaveBinarySensor(BinarySensorDevice, ZWaveDeviceEntity):
     """Representation of a binary sensor within Z-Wave."""
 
-    def __init__(self, value, sensor_class):
+    def __init__(self, value, sensor_class, location_in_name=False):
         """Initialize the sensor."""
         self._sensor_type = sensor_class
         # pylint: disable=import-error
         from openzwave.network import ZWaveNetwork
         from pydispatch import dispatcher
 
-        ZWaveDeviceEntity.__init__(self, value, DOMAIN)
+        ZWaveDeviceEntity.__init__(self, value, DOMAIN, location_in_name)
 
         dispatcher.connect(
             self.value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
@@ -103,9 +106,12 @@ class ZWaveBinarySensor(BinarySensorDevice, ZWaveDeviceEntity):
 class ZWaveTriggerSensor(ZWaveBinarySensor):
     """Representation of a stateless sensor within Z-Wave."""
 
-    def __init__(self, sensor_value, sensor_class, hass, re_arm_sec=60):
+    # pylint: disable=too-many-arguments
+    def __init__(self, sensor_value, sensor_class, hass, re_arm_sec=60,
+                 location_in_name=False):
         """Initialize the sensor."""
-        super(ZWaveTriggerSensor, self).__init__(sensor_value, sensor_class)
+        super(ZWaveTriggerSensor, self).__init__(sensor_value, sensor_class,
+                                                 location_in_name)
         self._hass = hass
         self.re_arm_sec = re_arm_sec
         self.invalidate_after = dt_util.utcnow() + datetime.timedelta(

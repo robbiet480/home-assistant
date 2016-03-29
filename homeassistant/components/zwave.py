@@ -24,6 +24,7 @@ CONF_USB_STICK_PATH = "usb_path"
 DEFAULT_CONF_USB_STICK_PATH = "/zwaveusbstick"
 CONF_DEBUG = "debug"
 CONF_POLLING_INTERVAL = "polling_interval"
+CONF_LOCATION_IN_NAME = "location_in_name"
 CONF_POLLING_INTENSITY = "polling_intensity"
 DEFAULT_ZWAVE_CONFIG_PATH = os.path.join(sys.prefix, 'share',
                                          'python-openzwave', 'config')
@@ -106,24 +107,33 @@ def _obj_to_dict(obj):
             if key[0] != '_' and not hasattr(getattr(obj, key), '__call__')}
 
 
-def _node_name(node):
+def _node_name(node, location_in_name=False):
     """Return the name of the node."""
-    return node.name or "{} {}".format(
-        node.manufacturer_name, node.product_name)
+    if location_in_name is False:
+        return node.name or "{} {}".format(
+            node.manufacturer_name, node.product_name)
+    else:
+        if node.name is not None and node.location is not None:
+            return "{} {}".format(node.name, node.location)
+        elif node.name is not None:
+            return node.name
+        else:
+            return "{} {}".format(node.manufacturer_name, node.product_name)
 
 
-def _value_name(value):
+def _value_name(value, location_in_name=False):
     """Return the name of the value."""
-    return "{} {}".format(_node_name(value.node), value.label)
+    return "{} {}".format(_node_name(value.node, location_in_name),
+                          value.label)
 
 
-def _object_id(value):
+def _object_id(value, location_in_name=False):
     """Return the object_id of the device value.
 
     The object_id contains node_id and value instance id
     to not collide with other entity_ids.
     """
-    object_id = "{}_{}".format(slugify(_value_name(value)),
+    object_id = "{}_{}".format(slugify(_value_name(value, location_in_name)),
                                value.node.node_id)
 
     # Add the instance id if there is more than one instance for the value
@@ -219,7 +229,9 @@ def setup(hass, config):
             bootstrap.setup_component(hass, component, config)
 
             # Configure node
-            name = "{}.{}".format(component, _object_id(value))
+            object_id = _object_id(value,
+                                   config[DOMAIN].get(CONF_POLLING_INTERVAL))
+            name = "{}.{}".format(component, object_id)
 
             node_config = customize.get(name, {})
             polling_intensity = convert(
@@ -319,9 +331,10 @@ def setup(hass, config):
 class ZWaveDeviceEntity:
     """Representation of a Z-Wave node entity."""
 
-    def __init__(self, value, domain):
+    def __init__(self, value, domain, location_in_name=False):
         """Initialize the z-Wave device."""
         self._value = value
+        self._location_in_name = location_in_name
         self.entity_id = "{}.{}".format(domain, self._object_id())
 
     @property
@@ -338,7 +351,7 @@ class ZWaveDeviceEntity:
     @property
     def name(self):
         """Return the name of the device."""
-        return _value_name(self._value)
+        return _value_name(self._value, self._location_in_name)
 
     def _object_id(self):
         """Return the object_id of the device value.
@@ -346,7 +359,7 @@ class ZWaveDeviceEntity:
         The object_id contains node_id and value instance id to not collide
         with other entity_ids.
         """
-        return _object_id(self._value)
+        return _object_id(self._value, self._location_in_name)
 
     @property
     def device_state_attributes(self):
