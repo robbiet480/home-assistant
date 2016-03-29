@@ -97,6 +97,8 @@ ATTR_SCENE_ID = "scene_id"
 
 NETWORK = None
 
+LOCATION_IN_NAME = False
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -197,6 +199,8 @@ def setup(hass, config):
 
     NETWORK = ZWaveNetwork(options, autostart=False)
 
+    LOCATION_IN_NAME = config[DOMAIN].get(CONF_LOCATION_IN_NAME)
+
     if use_debug:
         def log_all(signal, value=None):
             """Log all the signals."""
@@ -229,8 +233,7 @@ def setup(hass, config):
             bootstrap.setup_component(hass, component, config)
 
             # Configure node
-            object_id = _object_id(value,
-                                   config[DOMAIN].get(CONF_POLLING_INTERVAL))
+            object_id = _object_id(value, LOCATION_IN_NAME)
             name = "{}.{}".format(component, object_id)
 
             node_config = customize.get(name, {})

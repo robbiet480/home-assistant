@@ -11,7 +11,7 @@ from threading import Timer
 from homeassistant.components.light import ATTR_BRIGHTNESS, DOMAIN, Light
 from homeassistant.components.zwave import (
     ATTR_NODE_ID, ATTR_VALUE_ID, COMMAND_CLASS_SWITCH_MULTILEVEL, GENRE_USER,
-    NETWORK, TYPE_BYTE, ZWaveDeviceEntity)
+    NETWORK, LOCATION_IN_NAME, TYPE_BYTE, ZWaveDeviceEntity)
 from homeassistant.const import STATE_OFF, STATE_ON
 
 
@@ -31,8 +31,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         return
 
     value.set_change_verified(False)
-    location_in_name = config["zwave"].get("location_in_name")
-    add_devices([ZwaveDimmer(value, location_in_name)])
+
+    add_devices([ZwaveDimmer(value, LOCATION_IN_NAME)])
 
 
 def brightness_state(value):

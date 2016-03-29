@@ -11,7 +11,7 @@ from homeassistant.helpers.event import track_point_in_time
 
 from homeassistant.components.zwave import (
     ATTR_NODE_ID, ATTR_VALUE_ID,
-    COMMAND_CLASS_SENSOR_BINARY, NETWORK,
+    COMMAND_CLASS_SENSOR_BINARY, NETWORK, LOCATION_IN_NAME,
     ZWaveDeviceEntity, get_config_value)
 from homeassistant.components.binary_sensor import (
     DOMAIN,
@@ -43,8 +43,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     value = node.values[discovery_info[ATTR_VALUE_ID]]
     value.set_change_verified(False)
 
-    location_in_name = config["zwave"].get("location_in_name")
-
     # Make sure that we have values for the key before converting to int
     if (value.node.manufacturer_id.strip() and
             value.node.product_id.strip()):
@@ -59,7 +57,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
                 add_devices([
                     ZWaveTriggerSensor(value, "motion",
                                        hass, re_arm_multiplier * 8,
-                                       location_in_name)
+                                       LOCATION_IN_NAME)
                 ])
                 return
 

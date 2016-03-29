@@ -9,7 +9,7 @@ https://home-assistant.io/components/switch.zwave/
 from homeassistant.components.switch import DOMAIN, SwitchDevice
 from homeassistant.components.zwave import (
     ATTR_NODE_ID, ATTR_VALUE_ID, COMMAND_CLASS_SWITCH_BINARY, GENRE_USER,
-    NETWORK, TYPE_BOOL, ZWaveDeviceEntity)
+    NETWORK, LOCATION_IN_NAME, TYPE_BOOL, ZWaveDeviceEntity)
 
 
 # pylint: disable=unused-argument
@@ -29,8 +29,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         return
 
     value.set_change_verified(False)
-    location_in_name = config["zwave"].get("location_in_name")
-    add_devices([ZwaveSwitch(value, location_in_name)])
+
+    add_devices([ZwaveSwitch(value, LOCATION_IN_NAME)])
 
 
 class ZwaveSwitch(ZWaveDeviceEntity, SwitchDevice):
