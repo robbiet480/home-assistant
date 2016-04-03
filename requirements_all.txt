@@ -213,6 +213,9 @@ python-nmap==0.6.0
 # homeassistant.components.notify.pushover
 python-pushover==0.2
 
+# homeassistant.components.socket_io_eventstream
+python-socketio==1.2
+
 # homeassistant.components.statsd
 python-statsd==1.7.2
 
