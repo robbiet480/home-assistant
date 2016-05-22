@@ -1,10 +1,9 @@
 """
-Rest API for Home Assistant.
+Socket.io for Home Assistant.
 
-For more details about the RESTful API, please refer to the documentation at
-https://home-assistant.io/developers/api/
+For more details about Socket.io, please refer to the documentation at
+https://home-assistant.io/components/socketio/
 """
-import json
 import logging
 
 # import homeassistant.core as ha
@@ -29,30 +28,28 @@ REQUIREMENTS = ['python-socketio==1.3']
 
 _LOGGER = logging.getLogger(__name__)
 
+
 def setup(hass, config):
+    """Setup Socket.io server."""
+    import socketio
+    sio = socketio.Server(async_mode='eventlet')
 
-  import socketio
-  sio = socketio.Server(async_mode='eventlet')
-  # sio = socketio.Server(async_mode='eventlet', cors_allowed_origins=['localhost:9010'], cors_credentials=False)
+    @sio.on('connect')
+    # pylint: disable=unused-variable
+    def connect(sid, environ):
+        """Handle Socket.io connection events."""
+        print('connect', sid)
 
-  @sio.on('connect')
-  def connect(sid, environ):
-      environ['eventlet.minimum_write_chunk_size'] = 0
-      print('connect ', sid)
+    @sio.on('disconnect')
+    # pylint: disable=unused-variable
+    def disconnect(sid):
+        """Handle Socket.io disconnection events."""
+        print('disconnect ', sid)
 
-  @sio.on('my message')
-  def message(sid, data):
-      print('message ', data)
+    def socketio_mw(app):
+        """Build Socket.io middleware."""
+        return socketio.Middleware(sio, app)
 
-  @sio.on('disconnect')
-  def disconnect(sid):
-      print('disconnect ', sid)
+    hass.wsgi.register_wsgi_middleware(socketio_mw)
 
-  def socketio_mw(app):
-    return socketio.Middleware(sio, app)
-
-  hass.wsgi.register_wsgi_middleware(socketio_mw)
-
-  print('SOCKETIO SETUP!!!!!')
-
-  return True
+    return True
