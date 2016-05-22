@@ -267,8 +267,7 @@ class HomeAssistantWSGI(object):
             adapter = self.url_map.bind_to_environ(request.environ)
             try:
                 endpoint, values = adapter.match()
-                resp = self.views[endpoint].handle_request(request, **values)
-                return resp
+                return self.views[endpoint].handle_request(request, **values)
             except RequestRedirect as ex:
                 return ex
             except (BadRequest, NotFound, MethodNotAllowed,
