@@ -30,7 +30,6 @@ _FINGERPRINT = re.compile(r'^(.+)-[a-z0-9]{32}\.(\w+)$', re.IGNORECASE)
 
 _LOGGER = logging.getLogger(__name__)
 
-
 def setup(hass, config):
     """Set up the HTTP API and debug interface."""
     conf = config.get(DOMAIN, {})
@@ -167,6 +166,7 @@ class HomeAssistantWSGI(object):
         self.views = {}
         self.hass = hass
         self.extra_apps = {}
+        self.middleware = []
         self.development = development
         self.api_password = api_password
         self.ssl_certificate = ssl_certificate
@@ -236,6 +236,10 @@ class HomeAssistantWSGI(object):
 
         self.extra_apps[url_root] = app
 
+    def register_wsgi_middleware(self, middleware):
+        """Add to the WSGI middleware stack."""
+        self.middleware.append(middleware)
+
     def start(self):
         """Start the wsgi server."""
         from eventlet import wsgi
@@ -245,7 +249,12 @@ class HomeAssistantWSGI(object):
         if self.ssl_certificate:
             eventlet.wrap_ssl(sock, certfile=self.ssl_certificate,
                               keyfile=self.ssl_key, server_side=True)
-        wsgi.server(sock, self)
+
+        app = self
+        for middleware in self.middleware:
+            app = middleware(app)
+
+        wsgi.server(sock, app)
 
     def dispatch_request(self, request):
         """Handle incoming request."""
@@ -258,7 +267,8 @@ class HomeAssistantWSGI(object):
             adapter = self.url_map.bind_to_environ(request.environ)
             try:
                 endpoint, values = adapter.match()
-                return self.views[endpoint].handle_request(request, **values)
+                resp = self.views[endpoint].handle_request(request, **values)
+                return resp
             except RequestRedirect as ex:
                 return ex
             except (BadRequest, NotFound, MethodNotAllowed,
