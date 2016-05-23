@@ -29,35 +29,40 @@ REQUIREMENTS = ['python-socketio==1.3']
 
 _LOGGER = logging.getLogger(__name__)
 
+connections = []
 
 def setup(hass, config):
     """Setup Socket.io server."""
     import socketio
     sio = socketio.Server(async_mode='eventlet')
 
-    stop_obj = object()
-
     def thread_forward_events(event):
         """Forward events to the open request."""
         if event.event_type == EVENT_TIME_CHANGED:
             return
 
-        _LOGGER.debug('STREAM %s FORWARDING %s', id(stop_obj), event)
+        print("event", event)
 
-        if event.event_type == EVENT_HOMEASSISTANT_STOP:
-            data = stop_obj
-        else:
-            data = json.dumps(event, cls=rem.JSONEncoder)
+        _LOGGER.debug('STREAM FORWARDING %s', event)
 
-        sio.emit(event.event_type, data=data, room=event.event_type)
-        sio.emit(event.event_type, data=data)
+        data = json.dumps(event, cls=rem.JSONEncoder)
+
+        room_name = "events/{}".format(event.event_type)
+
+        # sio.emit(event.event_type, data=data, room=room_name)
+        sio.send(data=data)
+        # print('EMIT', connections[0])
+
+    hass.bus.listen(MATCH_ALL, thread_forward_events)
 
     @sio.on('connect')
     # pylint: disable=unused-variable
     def connect(sid, environ):
         """Handle Socket.io connection events."""
         print('connect', sid)
-        hass.bus.listen(MATCH_ALL, thread_forward_events)
+        sio.emit('my event', data={'foo': 'bar'}, room=sid)
+        sio.enter_room(sid, 'testroom')
+        connections.append(sid)
 
     @sio.on('disconnect')
     # pylint: disable=unused-variable
