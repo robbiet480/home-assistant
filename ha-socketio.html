@@ -1,0 +1,27 @@
+<html>
+<head>
+<title>socketio</title>
+</head>
+<body>
+<h1>hi</h1>
+<script src="https://code.jquery.com/jquery-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.4.6/socket.io.js"></script>
+<script type="text/javascript">
+$(document).ready(function(){
+  var socket = io('http://127.0.0.1:8123/', {transports: ['websocket','polling']});
+  socket.on('connect', function(){console.log('connect!');});
+  socket.on('message', function(data){console.log('data!', data);});
+  socket.on('disconnect', function(){console.log('disconnect!');});
+  socket.on('events/state_changed', function (data) {
+    console.log('state_changed received!', data);
+  });
+  socket.on('events/test', function (data) {
+    console.log('test received!', data);
+  });
+  socket.on('my event', function (data) {
+    console.log('my event received!', data);
+  });
+})
+</script>
+</body>
+</html>
