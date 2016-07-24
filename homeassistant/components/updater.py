@@ -30,12 +30,12 @@ def _load_uuid(hass, filename=UPDATER_UUID_FILE):
     if not os.path.isfile(path):
         # file not found create it
         with open(path, 'w') as uuidfile:
-            uuidfile.write(json.dumps({"uuid":uuid.uuid4().hex}))
+            uuidfile.write(json.dumps({"uuid": uuid.uuid4().hex}))
             uuidfile.close()
 
     try:
         with open(path) as uuidfile:
-            return uuid.UUID(json.loads(uuidfile.read())['uuid'], version = 4)
+            return uuid.UUID(json.loads(uuidfile.read())['uuid'], version=4)
     except (ValueError, AttributeError):
         return None
 
@@ -46,7 +46,7 @@ def setup(hass, config):
         # This component only makes sense in release versions
         _LOGGER.warning('Updater not supported in development version')
         return False
-    
+
     global HUUID
     HUUID = _load_uuid(hass).hex
 
