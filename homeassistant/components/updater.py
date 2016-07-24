@@ -20,6 +20,8 @@ DOMAIN = 'updater'
 ENTITY_ID = 'updater.updater'
 
 UPDATER_UUID_FILE = "uuid.conf"
+HUUID = ""
+
 
 def _load_uuid(hass, filename=UPDATER_UUID_FILE):
     """Load UUID from a file, if it exist if not create it"""
@@ -40,10 +42,13 @@ def _load_uuid(hass, filename=UPDATER_UUID_FILE):
 
 def setup(hass, config):
     """Setup the updater component."""
-    if 'dev' in CURRENT_VERSION:
+    if 'dev' not in CURRENT_VERSION:
         # This component only makes sense in release versions
         _LOGGER.warning('Updater not supported in development version')
         return False
+    
+    global HUUID
+    HUUID = _load_uuid(hass).hex
 
     def check_newest_version(_=None):
         """Check if a new version is available and report if one is."""
@@ -63,14 +68,13 @@ def setup(hass, config):
 
 def get_newest_version():
     """Get the newest Home Assistant version."""
-    huuid = _load_uuid(hass)
     try:
         req = requests.post(
                     UPDATER_URL,
                     data=json.dumps({
-                                "uuid":huuid.hex,
-                                "version":CURRENT_VERSION
-                            })
+                                "uuid": HUUID,
+                                "version": CURRENT_VERSION,
+                                })
                     )
 
         return req.json()['version']
