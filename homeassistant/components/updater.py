@@ -9,18 +9,19 @@ import os
 import requests
 import uuid
 import json
+import homeassistant.util.dt as dt_util
 
 from homeassistant.const import __version__ as CURRENT_VERSION
 from homeassistant.const import ATTR_FRIENDLY_NAME
 from homeassistant.helpers import event
+from distutils.version import StrictVersion
 
 _LOGGER = logging.getLogger(__name__)
 UPDATER_URL = 'http://requestb.in/1a39v3a1'
 DOMAIN = 'updater'
 ENTITY_ID = 'updater.updater'
 
-UPDATER_UUID_FILE = "uuid.conf"
-HUUID = ""
+UPDATER_UUID_FILE = ".uuid"
 
 
 def _load_uuid(hass, filename=UPDATER_UUID_FILE):
@@ -47,16 +48,17 @@ def setup(hass, config):
         _LOGGER.warning('Updater not supported in development version')
         return False
 
-    global HUUID
-    HUUID = _load_uuid(hass).hex
+    huuid = _load_uuid(hass).hex
 
     def check_newest_version(_=None):
         """Check if a new version is available and report if one is."""
-        newest = get_newest_version()
+        newest = get_newest_version(huuid)
 
-        if newest != CURRENT_VERSION and newest is not None:
-            hass.states.set(
-                ENTITY_ID, newest, {ATTR_FRIENDLY_NAME: 'Update Available'})
+        if newest is not None:
+            if StrictVersion(newest) > StrictVersion(CURRENT_VERSION):
+                hass.states.set(
+                    ENTITY_ID, newest, {ATTR_FRIENDLY_NAME: 'Update Available'}
+                )
 
     event.track_time_change(hass, check_newest_version,
                             hour=[0, 12], minute=0, second=0)
@@ -66,14 +68,15 @@ def setup(hass, config):
     return True
 
 
-def get_newest_version():
+def get_newest_version(huuid):
     """Get the newest Home Assistant version."""
     try:
         req = requests.post(
                     UPDATER_URL,
                     data=json.dumps({
-                                "uuid": HUUID,
+                                "uuid": huuid,
                                 "version": CURRENT_VERSION,
+                                "timezone": dt_util.DEFAULT_TIME_ZONE.zone,
                                 })
                     )
 
