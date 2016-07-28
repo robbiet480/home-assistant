@@ -17,7 +17,7 @@ from homeassistant.helpers import event
 from distutils.version import StrictVersion
 
 _LOGGER = logging.getLogger(__name__)
-UPDATER_URL = 'http://requestb.in/1a39v3a1'
+UPDATER_URL = 'http://requestb.in/156pbfc1'
 DOMAIN = 'updater'
 ENTITY_ID = 'updater.updater'
 
