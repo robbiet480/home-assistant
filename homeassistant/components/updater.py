@@ -17,10 +17,10 @@ from homeassistant.helpers import event
 from distutils.version import StrictVersion
 
 _LOGGER = logging.getLogger(__name__)
-UPDATER_URL = 'http://requestb.in/156pbfc1'
+UPDATER_URL = 'https://1cnlq5djza.execute-api.us-west-2.amazonaws.com/prod'
 DOMAIN = 'updater'
 ENTITY_ID = 'updater.updater'
-
+ATTR_RELEASE_NOTES = 'release_notes'
 UPDATER_UUID_FILE = ".uuid"
 
 
@@ -52,12 +52,15 @@ def setup(hass, config):
 
     def check_newest_version(_=None):
         """Check if a new version is available and report if one is."""
-        newest = get_newest_version(huuid)
+        newest, releasenotes = get_newest_version(huuid)
 
         if newest is not None:
             if StrictVersion(newest) > StrictVersion(CURRENT_VERSION):
                 hass.states.set(
-                    ENTITY_ID, newest, {ATTR_FRIENDLY_NAME: 'Update Available'}
+                    ENTITY_ID, newest, {
+                                        ATTR_FRIENDLY_NAME: 'Update Available',
+                                        ATTR_RELEASE_NOTES: releasenotes
+                                        }
                 )
 
     event.track_time_change(hass, check_newest_version,
@@ -73,14 +76,13 @@ def get_newest_version(huuid):
     try:
         req = requests.post(
                     UPDATER_URL,
-                    data=json.dumps({
-                                "uuid": huuid,
-                                "version": CURRENT_VERSION,
-                                "timezone": dt_util.DEFAULT_TIME_ZONE.zone,
-                                })
+                    json={
+                            "uuid": huuid,
+                            "version": CURRENT_VERSION,
+                            "timezone": dt_util.DEFAULT_TIME_ZONE.zone,
+                        }
                     )
-
-        return req.json()['version']
+        return (req.json()['version'], req.json()['release-notes'])
     except requests.RequestException:
         _LOGGER.exception('Could not contact HASS Update to check for updates')
         return None
