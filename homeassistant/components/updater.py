@@ -43,7 +43,7 @@ def _load_uuid(hass, filename=UPDATER_UUID_FILE):
 
 def setup(hass, config):
     """Setup the updater component."""
-    if 'dev' not in CURRENT_VERSION:
+    if 'dev' in CURRENT_VERSION:
         # This component only makes sense in release versions
         _LOGGER.warning('Updater not supported in development version')
         return False
