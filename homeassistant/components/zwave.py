@@ -600,6 +600,14 @@ class ZWaveNodeConfigView(HomeAssistantView):
     url = "/api/zwave/nodes"
     name = "api:zwave:nodes"
 
+    def basic_string(self, basic):
+        return {
+            1: "Controller",
+            2: "Static Controller",
+            3: "Slave",
+            4: "Routing Slave"
+        }[basic]
+
     def values_to_dict(self, node):
         values = {}
         for value_id, value in node.values.items():
@@ -636,7 +644,7 @@ class ZWaveNodeConfigView(HomeAssistantView):
         all_nodes = {}
         for node_id, node in NETWORK.nodes.items():
             all_nodes[node_id] = {
-                'basic': node.basic,
+                'basic': self.basic_string(node.basic),
                 'capabilities': list(node.capabilities),
                 'command_classes_as_string': list(node.command_classes_as_string),
                 'device_type': node.device_type,
@@ -674,6 +682,7 @@ class ZWaveNodeConfigView(HomeAssistantView):
                 'version': node.version,
             }
         return all_nodes
+
 
     def get(self, request):
         """Retrieve if API is running."""
