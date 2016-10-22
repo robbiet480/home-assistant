@@ -186,6 +186,10 @@ https://github.com/danieljkemp/onkyo-eiscp/archive/python3.zip#onkyo-eiscp==0.9.
 # homeassistant.components.switch.tplink
 https://github.com/gadgetreactor/pyHS100/archive/ef85f939fd5b07064a0f34dfa673fa7d6140bd95.zip#pyHS100==0.1.2
 
+# homeassistant.components.binary_sensor.nut
+# homeassistant.components.sensor.nut
+https://github.com/hordurk/python-nut2/archive/e702614729904d9ea026f7e21755caf27b712cb2.zip#nut2==2.1.0
+
 # homeassistant.components.netatmo
 https://github.com/jabesq/netatmo-api-python/archive/v0.6.0.zip#lnetatmo==0.6.0
 

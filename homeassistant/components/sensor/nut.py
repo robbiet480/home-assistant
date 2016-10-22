@@ -10,7 +10,6 @@ import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 import homeassistant.helpers.config_validation as cv
-from homeassistant.components import apcupsd
 from homeassistant.const import (CONF_NAME, CONF_HOST, CONF_PORT,
                                  CONF_USERNAME, CONF_PASSWORD,
                                  TEMP_CELSIUS, CONF_MONITORED_VARIABLES)
@@ -38,7 +37,7 @@ SENSOR_TYPES = {
     'battery.date': ['Battery Replaced', '', 'mdi:calendar-clock'],
     'battery.packs': ['External Batteries', '', 'mdi:information-outline'],
     'battery.packs.bad': ['Bad Batteries', '', 'mdi:information-outline'],
-    'battery.runtime': ['Battery Timeout', '', 'mdi:timer-off'],
+    # 'battery.runtime': ['Battery Timeout', '', 'mdi:timer-off'],
     'battery.runtime': ['Time Left', '', 'mdi:clock-alert'],
     'battery.runtime.low': ['Low Battery Signal', '', 'mdi:clock-alert'],
     'battery.voltage': ['Battery Voltage', 'V', 'mdi:flash'],
@@ -104,8 +103,10 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_UPS_LIST): vol.All(cv.ensure_list, [UPS_SCHEMA]),
 })
 
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Setup the NUT sensors."""
+
     from nut2 import PyNUTClient
     client = PyNUTClient(host=config[CONF_HOST], port=config[CONF_PORT])
 
@@ -132,6 +133,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             entities.append(NUTSensor(client, ups_name, sensor_type))
 
     add_entities(entities)
+
 
 class NUTSensor(Entity):
     """Representation of a sensor entity for NUT status values."""
@@ -166,14 +168,14 @@ class NUTSensor(Entity):
         return self._unit
 
     def update(self):
-        from nut2 import PyNUTError
         """Get the latest status and use it to update our sensor state."""
+        from nut2 import PyNUTError
         try:
             self._state = self._client.get_var(self._ups_name, self.type)
         except PyNUTError as exc:
             if str(exc) == "ERR VAR-NOT-SUPPORTED":
                 _LOGGER.error('Sensor type: "%s" is not a valid variable',
-                                self.type)
+                              self.type)
                 self._state = None
             else:
                 _LOGGER.error(exc)
