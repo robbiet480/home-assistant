@@ -12,7 +12,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.helpers.entity import Entity
 from homeassistant.components.discovery import load_platform
 
-REQUIREMENTS = ['pyenvisalink==1.7', 'pydispatcher==2.0.5']
+REQUIREMENTS = ['pyenvisalink==1.9', 'pydispatcher==2.0.5']
 
 _LOGGER = logging.getLogger(__name__)
 DOMAIN = 'envisalink'
@@ -77,8 +77,7 @@ CONFIG_SCHEMA = vol.Schema({
 }, extra=vol.ALLOW_EXTRA)
 
 
-# pylint: disable=unused-argument, too-many-function-args, too-many-locals
-# pylint: disable=too-many-return-statements
+# pylint: disable=unused-argument
 def setup(hass, base_config):
     """Common setup for Envisalink devices."""
     from pyenvisalink import EnvisalinkAlarmPanel

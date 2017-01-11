@@ -12,7 +12,7 @@ import voluptuous as vol
 from homeassistant.components.media_player import (
     MEDIA_TYPE_MUSIC, SUPPORT_NEXT_TRACK, SUPPORT_PAUSE, PLATFORM_SCHEMA,
     SUPPORT_PREVIOUS_TRACK, SUPPORT_TURN_OFF, SUPPORT_TURN_ON,
-    SUPPORT_VOLUME_SET, SUPPORT_PLAY_MEDIA, MEDIA_TYPE_PLAYLIST,
+    SUPPORT_VOLUME_SET, SUPPORT_PLAY_MEDIA, SUPPORT_PLAY, MEDIA_TYPE_PLAYLIST,
     MediaPlayerDevice)
 from homeassistant.const import (
     STATE_OFF, STATE_PAUSED, STATE_PLAYING, CONF_PORT, CONF_PASSWORD,
@@ -30,7 +30,7 @@ DEFAULT_PORT = 6600
 
 SUPPORT_MPD = SUPPORT_PAUSE | SUPPORT_VOLUME_SET | SUPPORT_TURN_OFF | \
     SUPPORT_TURN_ON | SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK | \
-    SUPPORT_PLAY_MEDIA
+    SUPPORT_PLAY_MEDIA | SUPPORT_PLAY
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_HOST): cv.string,
@@ -77,7 +77,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 class MpdDevice(MediaPlayerDevice):
     """Representation of a MPD server."""
 
-    # pylint: disable=no-member, too-many-public-methods, abstract-method
+    # pylint: disable=no-member
     def __init__(self, server, port, location, password):
         """Initialize the MPD device."""
         import mpd
@@ -100,7 +100,7 @@ class MpdDevice(MediaPlayerDevice):
         try:
             self.status = self.client.status()
             self.currentsong = self.client.currentsong()
-        except (mpd.ConnectionError, BrokenPipeError, ValueError):
+        except (mpd.ConnectionError, OSError, BrokenPipeError, ValueError):
             # Cleanly disconnect in case connection is not in valid state
             try:
                 self.client.disconnect()
@@ -133,7 +133,7 @@ class MpdDevice(MediaPlayerDevice):
     @property
     def media_content_id(self):
         """Content ID of current playing media."""
-        return self.currentsong['id']
+        return self.currentsong.get('file')
 
     @property
     def media_content_type(self):

@@ -38,11 +38,11 @@ DEFAULT_VERSION = 1.4
 DEFAULT_BAUD_RATE = 115200
 DEFAULT_TCP_PORT = 5003
 DOMAIN = 'mysensors'
-GATEWAYS = None
+MYSENSORS_GATEWAYS = 'mysensors_gateways'
 MQTT_COMPONENT = 'mqtt'
 REQUIREMENTS = [
     'https://github.com/theolind/pymysensors/archive/'
-    '8ce98b7fb56f7921a808eb66845ce8b2c455c81e.zip#pymysensors==0.7.1']
+    '0b705119389be58332f17753c53167f551254b6c.zip#pymysensors==0.8']
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -69,7 +69,7 @@ CONFIG_SCHEMA = vol.Schema({
 }, extra=vol.ALLOW_EXTRA)
 
 
-def setup(hass, config):  # pylint: disable=too-many-locals
+def setup(hass, config):
     """Setup the MySensors component."""
     import mysensors.mysensors as mysensors
 
@@ -79,7 +79,6 @@ def setup(hass, config):  # pylint: disable=too-many-locals
     def setup_gateway(device, persistence_file, baud_rate, tcp_port, in_prefix,
                       out_prefix):
         """Return gateway after setup of the gateway."""
-        # pylint: disable=too-many-arguments
         if device == MQTT_COMPONENT:
             if not setup_component(hass, MQTT_COMPONENT, config):
                 return
@@ -133,9 +132,15 @@ def setup(hass, config):  # pylint: disable=too-many-locals
 
         return gateway
 
+    gateways = hass.data.get(MYSENSORS_GATEWAYS)
+    if gateways is not None:
+        _LOGGER.error(
+            '%s already exists in %s, will not setup %s component',
+            MYSENSORS_GATEWAYS, hass.data, DOMAIN)
+        return False
+
     # Setup all devices from config
-    global GATEWAYS
-    GATEWAYS = {}
+    gateways = []
     conf_gateways = config[DOMAIN][CONF_GATEWAYS]
 
     for index, gway in enumerate(conf_gateways):
@@ -147,16 +152,18 @@ def setup(hass, config):  # pylint: disable=too-many-locals
         tcp_port = gway.get(CONF_TCP_PORT)
         in_prefix = gway.get(CONF_TOPIC_IN_PREFIX)
         out_prefix = gway.get(CONF_TOPIC_OUT_PREFIX)
-        GATEWAYS[device] = setup_gateway(
+        ready_gateway = setup_gateway(
             device, persistence_file, baud_rate, tcp_port, in_prefix,
             out_prefix)
-        if GATEWAYS[device] is None:
-            GATEWAYS.pop(device)
+        if ready_gateway is not None:
+            gateways.append(ready_gateway)
 
-    if not GATEWAYS:
+    if not gateways:
         _LOGGER.error(
             'No devices could be setup as gateways, check your configuration')
         return False
+
+    hass.data[MYSENSORS_GATEWAYS] = gateways
 
     for component in ['sensor', 'switch', 'light', 'binary_sensor', 'climate',
                       'cover']:
@@ -200,8 +207,6 @@ def pf_callback_factory(map_sv_types, devices, add_devices, entity_class):
 
 class GatewayWrapper(object):
     """Gateway wrapper class."""
-
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, gateway, optimistic, device):
         """Setup class attributes on instantiation.
@@ -255,8 +260,6 @@ class GatewayWrapper(object):
 
 class MySensorsDeviceEntity(object):
     """Represent a MySensors entity."""
-
-    # pylint: disable=too-many-arguments
 
     def __init__(
             self, gateway, node_id, child_id, name, value_type, child_type):

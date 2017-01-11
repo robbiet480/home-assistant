@@ -31,11 +31,17 @@ CONF_POLLING_INTENSITY = 'polling_intensity'
 CONF_POLLING_INTERVAL = 'polling_interval'
 CONF_USB_STICK_PATH = 'usb_path'
 CONF_CONFIG_PATH = 'config_path'
+CONF_IGNORED = 'ignored'
+CONF_REFRESH_VALUE = 'refresh_value'
+CONF_REFRESH_DELAY = 'delay'
 
 DEFAULT_CONF_AUTOHEAL = True
 DEFAULT_CONF_USB_STICK_PATH = '/zwaveusbstick'
 DEFAULT_POLLING_INTERVAL = 60000
-DEFAULT_DEBUG = True
+DEFAULT_DEBUG = False
+DEFAULT_CONF_IGNORED = False
+DEFAULT_CONF_REFRESH_VALUE = False
+DEFAULT_CONF_REFRESH_DELAY = 2
 DOMAIN = 'zwave'
 
 NETWORK = None
@@ -125,15 +131,32 @@ RENAME_NODE_SCHEMA = vol.Schema({
     vol.Required(const.ATTR_NAME): cv.string,
 })
 SET_CONFIG_PARAMETER_SCHEMA = vol.Schema({
-    vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+    vol.Required(const.ATTR_NODE_ID): vol.Coerce(int),
     vol.Required(const.ATTR_CONFIG_PARAMETER): vol.Coerce(int),
     vol.Required(const.ATTR_CONFIG_VALUE): vol.Coerce(int),
     vol.Optional(const.ATTR_CONFIG_SIZE): vol.Coerce(int)
 })
+PRINT_CONFIG_PARAMETER_SCHEMA = vol.Schema({
+    vol.Required(const.ATTR_NODE_ID): vol.Coerce(int),
+    vol.Required(const.ATTR_CONFIG_PARAMETER): vol.Coerce(int),
+})
+
+CHANGE_ASSOCIATION_SCHEMA = vol.Schema({
+    vol.Required(const.ATTR_ASSOCIATION): cv.string,
+    vol.Required(const.ATTR_NODE_ID): vol.Coerce(int),
+    vol.Required(const.ATTR_TARGET_NODE_ID): vol.Coerce(int),
+    vol.Required(const.ATTR_GROUP): vol.Coerce(int),
+    vol.Optional(const.ATTR_INSTANCE, default=0x00): vol.Coerce(int)
+})
 
 CUSTOMIZE_SCHEMA = vol.Schema({
     vol.Optional(CONF_POLLING_INTENSITY):
-        vol.All(cv.positive_int, vol.In([0, 1, 2, 3, 4, 5])),
+        vol.All(cv.positive_int),
+    vol.Optional(CONF_IGNORED, default=DEFAULT_CONF_IGNORED): cv.boolean,
+    vol.Optional(CONF_REFRESH_VALUE, default=DEFAULT_CONF_REFRESH_VALUE):
+        cv.boolean,
+    vol.Optional(CONF_REFRESH_DELAY, default=DEFAULT_CONF_REFRESH_DELAY):
+        cv.positive_int
 })
 
 CONFIG_SCHEMA = vol.Schema({
@@ -142,7 +165,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_CONFIG_PATH): cv.string,
         vol.Optional(CONF_CUSTOMIZE, default={}):
             vol.Schema({cv.string: CUSTOMIZE_SCHEMA}),
-        vol.Optional(CONF_DEBUG, default=False): cv.boolean,
+        vol.Optional(CONF_DEBUG, default=DEFAULT_DEBUG): cv.boolean,
         vol.Optional(CONF_POLLING_INTERVAL, default=DEFAULT_POLLING_INTERVAL):
             cv.positive_int,
         vol.Optional(CONF_USB_STICK_PATH, default=DEFAULT_CONF_USB_STICK_PATH):
@@ -175,18 +198,19 @@ def _node_object_id(node):
     return node_object_id
 
 
-def _object_id(value):
+def object_id(value):
     """Return the object_id of the device value.
 
     The object_id contains node_id and value instance id
     to not collide with other entity_ids.
     """
-    object_id = "{}_{}".format(slugify(_value_name(value)), value.node.node_id)
+    _object_id = "{}_{}_{}".format(slugify(_value_name(value)),
+                                   value.node.node_id, value.index)
 
     # Add the instance id if there is more than one instance for the value
     if value.instance > 1:
-        return '{}_{}'.format(object_id, value.instance)
-    return object_id
+        return '{}_{}'.format(_object_id, value.instance)
+    return _object_id
 
 
 def nice_print_node(node):
@@ -236,13 +260,15 @@ def setup(hass, config):
     from pydispatch import dispatcher
     from openzwave.option import ZWaveOption
     from openzwave.network import ZWaveNetwork
+    from openzwave.group import ZWaveGroup
 
     default_zwave_config_path = os.path.join(os.path.dirname(
         libopenzwave.__file__), 'config')
 
     # Load configuration
     use_debug = config[DOMAIN].get(CONF_DEBUG)
-    customize = config[DOMAIN].get(CONF_CUSTOMIZE)
+    hass.data['zwave_customize'] = config[DOMAIN].get(CONF_CUSTOMIZE)
+    customize = hass.data['zwave_customize']
     autoheal = config[DOMAIN].get(CONF_AUTOHEAL)
 
     # Setup options
@@ -320,9 +346,14 @@ def setup(hass, config):
                           node.generic, node.specific,
                           value.command_class, value.type,
                           value.genre)
-            name = "{}.{}".format(component, _object_id(value))
+            name = "{}.{}".format(component, object_id(value))
 
             node_config = customize.get(name, {})
+
+            if node_config.get(CONF_IGNORED):
+                _LOGGER.info("Ignoring device %s", name)
+                return
+
             polling_intensity = convert(
                 node_config.get(CONF_POLLING_INTENSITY), int)
             if polling_intensity:
@@ -413,7 +444,8 @@ def setup(hass, config):
         """Stop Z-Wave network."""
         _LOGGER.info("Stopping ZWave network.")
         NETWORK.stop()
-        hass.bus.fire(const.EVENT_NETWORK_STOP)
+        if hass.state == 'RUNNING':
+            hass.bus.fire(const.EVENT_NETWORK_STOP)
 
     def rename_node(service):
         """Rename a node."""
@@ -427,15 +459,60 @@ def setup(hass, config):
 
     def set_config_parameter(service):
         """Set a config parameter to a node."""
-        state = hass.states.get(service.data.get(ATTR_ENTITY_ID))
-        node_id = state.attributes.get(const.ATTR_NODE_ID)
+        node_id = service.data.get(const.ATTR_NODE_ID)
         node = NETWORK.nodes[node_id]
         param = service.data.get(const.ATTR_CONFIG_PARAMETER)
-        value = service.data.get(const.ATTR_CONFIG_VALUE)
+        selection = service.data.get(const.ATTR_CONFIG_VALUE)
         size = service.data.get(const.ATTR_CONFIG_SIZE, 2)
-        node.set_config_param(param, value, size)
-        _LOGGER.info("Setting config parameter %s on Node %s "
-                     "with value %s and size=%s", param, node_id, value, size)
+        i = 0
+        for value in (
+                node.get_values(class_id=const.COMMAND_CLASS_CONFIGURATION)
+                .values()):
+            if value.index == param and value.type == const.TYPE_LIST:
+                _LOGGER.debug('Values for parameter %s: %s', param,
+                              value.data_items)
+                i = len(value.data_items) - 1
+        if i == 0:
+            node.set_config_param(param, selection, size)
+        else:
+            if selection > i:
+                _LOGGER.info('Config parameter selection does not exist!'
+                             ' Please check zwcfg_[home_id].xml in'
+                             ' your homeassistant config directory. '
+                             ' Available selections are 0 to %s', i)
+                return
+            node.set_config_param(param, selection, size)
+            _LOGGER.info('Setting config parameter %s on Node %s '
+                         'with selection %s and size=%s', param, node_id,
+                         selection, size)
+
+    def print_config_parameter(service):
+        """Print a config parameter from a node."""
+        node_id = service.data.get(const.ATTR_NODE_ID)
+        node = NETWORK.nodes[node_id]
+        param = service.data.get(const.ATTR_CONFIG_PARAMETER)
+        _LOGGER.info("Config parameter %s on Node %s : %s",
+                     param, node_id, get_config_value(node, param))
+
+    def change_association(service):
+        """Change an association in the zwave network."""
+        association_type = service.data.get(const.ATTR_ASSOCIATION)
+        node_id = service.data.get(const.ATTR_NODE_ID)
+        target_node_id = service.data.get(const.ATTR_TARGET_NODE_ID)
+        group = service.data.get(const.ATTR_GROUP)
+        instance = service.data.get(const.ATTR_INSTANCE)
+
+        node = ZWaveGroup(group, NETWORK, node_id)
+        if association_type == 'add':
+            node.add_association(target_node_id, instance)
+            _LOGGER.info("Adding association for node:%s in group:%s "
+                         "target node:%s, instance=%s", node_id, group,
+                         target_node_id, instance)
+        if association_type == 'remove':
+            node.remove_association(target_node_id, instance)
+            _LOGGER.info("Removing association for node:%s in group:%s "
+                         "target node:%s, instance=%s", node_id, group,
+                         target_node_id, instance)
 
     def start_zwave(_service_or_event):
         """Startup Z-Wave network."""
@@ -502,6 +579,16 @@ def setup(hass, config):
                                descriptions[
                                    const.SERVICE_SET_CONFIG_PARAMETER],
                                schema=SET_CONFIG_PARAMETER_SCHEMA)
+        hass.services.register(DOMAIN, const.SERVICE_PRINT_CONFIG_PARAMETER,
+                               print_config_parameter,
+                               descriptions[
+                                   const.SERVICE_PRINT_CONFIG_PARAMETER],
+                               schema=PRINT_CONFIG_PARAMETER_SCHEMA)
+        hass.services.register(DOMAIN, const.SERVICE_CHANGE_ASSOCIATION,
+                               change_association,
+                               descriptions[
+                                   const.SERVICE_CHANGE_ASSOCIATION],
+                               schema=CHANGE_ASSOCIATION_SCHEMA)
 
     # Setup autoheal
     if autoheal:
@@ -543,7 +630,7 @@ class ZWaveDeviceEntity:
         The object_id contains node_id and value instance id to not collide
         with other entity_ids.
         """
-        return _object_id(self._value)
+        return object_id(self._value)
 
     @property
     def device_state_attributes(self):
@@ -552,7 +639,12 @@ class ZWaveDeviceEntity:
             const.ATTR_NODE_ID: self._value.node.node_id,
         }
 
-        battery_level = self._value.node.get_battery_level()
+        try:
+            battery_level = self._value.node.get_battery_level()
+        except RuntimeError:
+            # If we get an runtime error the dict has changed while
+            # we was looking for a value, just do it again
+            battery_level = self._value.node.get_battery_level()
 
         if battery_level is not None:
             attrs[ATTR_BATTERY_LEVEL] = battery_level

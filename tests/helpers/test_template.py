@@ -1,5 +1,5 @@
 """Test Home Assistant template helper methods."""
-# pylint: disable=too-many-public-methods
+from datetime import datetime
 import unittest
 from unittest.mock import patch
 
@@ -22,14 +22,16 @@ from tests.common import get_test_home_assistant
 class TestHelpersTemplate(unittest.TestCase):
     """Test the Template."""
 
-    def setUp(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def setUp(self):
         """Setup the tests."""
         self.hass = get_test_home_assistant()
         self.hass.config.units = UnitSystem('custom', TEMP_CELSIUS,
                                             LENGTH_METERS, VOLUME_LITERS,
                                             MASS_GRAMS)
 
-    def tearDown(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def tearDown(self):
         """Stop down stuff we started."""
         self.hass.stop()
 
@@ -121,6 +123,32 @@ class TestHelpersTemplate(unittest.TestCase):
                 template.Template('{{ %s | multiply(10) | round }}' % inp,
                                   self.hass).render())
 
+    def test_strptime(self):
+        """Test the parse timestamp method."""
+        tests = [
+            ('2016-10-19 15:22:05.588122 UTC',
+             '%Y-%m-%d %H:%M:%S.%f %Z', None),
+            ('2016-10-19 15:22:05.588122+0100',
+             '%Y-%m-%d %H:%M:%S.%f%z', None),
+            ('2016-10-19 15:22:05.588122',
+             '%Y-%m-%d %H:%M:%S.%f', None),
+            ('2016-10-19', '%Y-%m-%d', None),
+            ('2016', '%Y', None),
+            ('15:22:05', '%H:%M:%S', None),
+            ('1469119144', '%Y', '1469119144'),
+            ('invalid', '%Y', 'invalid')
+        ]
+
+        for inp, fmt, expected in tests:
+            if expected is None:
+                expected = datetime.strptime(inp, fmt)
+
+            temp = '{{ strptime(\'%s\', \'%s\') }}' % (inp, fmt)
+
+            self.assertEqual(
+                str(expected),
+                template.Template(temp, self.hass).render())
+
     def test_timestamp_custom(self):
         """Test the timestamps to custom filter."""
         tests = [
@@ -205,6 +233,34 @@ class TestHelpersTemplate(unittest.TestCase):
         self.assertEqual(
             '-',
             tpl.render_with_possible_json_value('hello', '-'))
+
+    def test_render_with_possible_json_value_with_missing_json_value(self):
+        """Render with possible JSON value with unknown JSON object."""
+        tpl = template.Template('{{ value_json.goodbye }}', self.hass)
+        self.assertEqual(
+            '',
+            tpl.render_with_possible_json_value('{"hello": "world"}'))
+
+    def test_render_with_possible_json_value_valid_with_is_defined(self):
+        """Render with possible JSON value with known JSON object."""
+        tpl = template.Template('{{ value_json.hello|is_defined }}', self.hass)
+        self.assertEqual(
+            'world',
+            tpl.render_with_possible_json_value('{"hello": "world"}'))
+
+    def test_render_with_possible_json_value_undefined_json(self):
+        """Render with possible JSON value with unknown JSON object."""
+        tpl = template.Template('{{ value_json.bye|is_defined }}', self.hass)
+        self.assertEqual(
+            '{"hello": "world"}',
+            tpl.render_with_possible_json_value('{"hello": "world"}'))
+
+    def test_render_with_possible_json_value_undefined_json_error_value(self):
+        """Render with possible JSON value with unknown JSON object."""
+        tpl = template.Template('{{ value_json.bye|is_defined }}', self.hass)
+        self.assertEqual(
+            '',
+            tpl.render_with_possible_json_value('{"hello": "world"}', ''))
 
     def test_raise_exception_on_error(self):
         """Test raising an exception on error."""
@@ -402,7 +458,8 @@ class TestHelpersTemplate(unittest.TestCase):
             'longitude': self.hass.config.longitude,
         })
 
-        group.Group(self.hass, 'location group', ['test_domain.object'])
+        group.Group.create_group(
+            self.hass, 'location group', ['test_domain.object'])
 
         self.assertEqual(
             'test_domain.object',
@@ -422,7 +479,8 @@ class TestHelpersTemplate(unittest.TestCase):
             'longitude': self.hass.config.longitude,
         })
 
-        group.Group(self.hass, 'location group', ['test_domain.object'])
+        group.Group.create_group(
+            self.hass, 'location group', ['test_domain.object'])
 
         self.assertEqual(
             'test_domain.object',

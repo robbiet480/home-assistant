@@ -13,7 +13,7 @@ from homeassistant.components.notify import (
 from homeassistant.const import (CONF_API_KEY, CONF_SENDER, CONF_RECIPIENT)
 import homeassistant.helpers.config_validation as cv
 
-REQUIREMENTS = ['sendgrid==3.4.0']
+REQUIREMENTS = ['sendgrid==3.6.3']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +34,6 @@ def get_service(hass, config):
     return SendgridNotificationService(api_key, sender, recipient)
 
 
-# pylint: disable=too-few-public-methods
 class SendgridNotificationService(BaseNotificationService):
     """Implementation the notification service for email via Sendgrid."""
 

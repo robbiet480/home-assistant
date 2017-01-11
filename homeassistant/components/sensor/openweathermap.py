@@ -17,11 +17,11 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
 
-REQUIREMENTS = ['pyowm==2.5.0']
+REQUIREMENTS = ['pyowm==2.6.0']
 
 _LOGGER = logging.getLogger(__name__)
 
-CONF_ATTRIBUTION = "Data provied by OpenWeatherMap"
+CONF_ATTRIBUTION = "Data provided by OpenWeatherMap"
 CONF_FORECAST = 'forecast'
 
 DEFAULT_NAME = 'OWM'
@@ -84,7 +84,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     add_devices(dev)
 
 
-# pylint: disable=too-few-public-methods
 class OpenWeatherMapSensor(Entity):
     """Implementation of an OpenWeatherMap sensor."""
 
@@ -121,7 +120,6 @@ class OpenWeatherMapSensor(Entity):
             ATTR_ATTRIBUTION: CONF_ATTRIBUTION,
         }
 
-    # pylint: disable=too-many-branches
     def update(self):
         """Get the latest data from OWM and updates the states."""
         self.owa_client.update()

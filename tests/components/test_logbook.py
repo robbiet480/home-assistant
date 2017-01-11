@@ -1,5 +1,5 @@
 """The tests for the logbook component."""
-# pylint: disable=protected-access,too-many-public-methods
+# pylint: disable=protected-access
 from datetime import timedelta
 import unittest
 from unittest.mock import patch
@@ -39,6 +39,7 @@ class TestComponentLogbook(unittest.TestCase):
         """Test if service call create log book entry."""
         calls = []
 
+        @ha.callback
         def event_listener(event):
             calls.append(event)
 
@@ -69,6 +70,7 @@ class TestComponentLogbook(unittest.TestCase):
         """Test if service call create log book entry without message."""
         calls = []
 
+        @ha.callback
         def event_listener(event):
             calls.append(event)
 
@@ -185,6 +187,43 @@ class TestComponentLogbook(unittest.TestCase):
                           domain=ha.DOMAIN)
         self.assert_entry(entries[1], pointB, 'blu', domain='sensor',
                           entity_id=entity_id2)
+
+    def test_exclude_automation_events(self):
+        """Test if automation entries can be excluded by entity_id."""
+        name = 'My Automation Rule'
+        message = 'has been triggered'
+        domain = 'automation'
+        entity_id = 'automation.my_automation_rule'
+        entity_id2 = 'automation.my_automation_rule_2'
+        entity_id2 = 'sensor.blu'
+
+        eventA = ha.Event(logbook.EVENT_LOGBOOK_ENTRY, {
+                logbook.ATTR_NAME: name,
+                logbook.ATTR_MESSAGE: message,
+                logbook.ATTR_DOMAIN: domain,
+                logbook.ATTR_ENTITY_ID: entity_id,
+                })
+        eventB = ha.Event(logbook.EVENT_LOGBOOK_ENTRY, {
+                logbook.ATTR_NAME: name,
+                logbook.ATTR_MESSAGE: message,
+                logbook.ATTR_DOMAIN: domain,
+                logbook.ATTR_ENTITY_ID: entity_id2,
+                })
+
+        config = logbook.CONFIG_SCHEMA({
+            ha.DOMAIN: {},
+            logbook.DOMAIN: {logbook.CONF_EXCLUDE: {
+                logbook.CONF_ENTITIES: [entity_id, ]}}})
+        events = logbook._exclude_events((ha.Event(EVENT_HOMEASSISTANT_STOP),
+                                          eventA, eventB), config)
+        entries = list(logbook.humanify(events))
+
+        self.assertEqual(2, len(entries))
+        self.assert_entry(
+            entries[0], name='Home Assistant', message='stopped',
+            domain=ha.DOMAIN)
+        self.assert_entry(
+            entries[1], name=name, domain=domain, entity_id=entity_id2)
 
     def test_include_events_entity(self):
         """Test if events are filtered if entity is included in config."""

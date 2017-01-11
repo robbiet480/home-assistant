@@ -6,7 +6,8 @@ import socket
 
 import voluptuous as vol
 
-from homeassistant.bootstrap import _setup_component
+from homeassistant.core import callback
+from homeassistant.bootstrap import setup_component
 import homeassistant.components.mqtt as mqtt
 from homeassistant.const import (
     EVENT_CALL_SERVICE, ATTR_DOMAIN, ATTR_SERVICE, EVENT_HOMEASSISTANT_START,
@@ -16,12 +17,13 @@ from tests.common import (
     get_test_home_assistant, mock_mqtt_component, fire_mqtt_message)
 
 
+# pylint: disable=invalid-name
 class TestMQTT(unittest.TestCase):
     """Test the MQTT component."""
 
     def setUp(self):  # pylint: disable=invalid-name
         """Setup things to be run when tests are started."""
-        self.hass = get_test_home_assistant(1)
+        self.hass = get_test_home_assistant()
         mock_mqtt_component(self.hass)
         self.calls = []
 
@@ -29,6 +31,7 @@ class TestMQTT(unittest.TestCase):
         """Stop everything that was started."""
         self.hass.stop()
 
+    @callback
     def record_calls(self, *args):
         """Helper for recording calls."""
         self.calls.append(args)
@@ -47,27 +50,37 @@ class TestMQTT(unittest.TestCase):
         self.hass.block_till_done()
         self.assertTrue(mqtt.MQTT_CLIENT.stop.called)
 
-    def test_setup_fails_if_no_connect_broker(self):
+    @mock.patch('paho.mqtt.client.Client')
+    def test_setup_fails_if_no_connect_broker(self, _):
         """Test for setup failure if connection to broker is missing."""
+        test_broker_cfg = {mqtt.DOMAIN: {mqtt.CONF_BROKER: 'test-broker'}}
+
         with mock.patch('homeassistant.components.mqtt.MQTT',
                         side_effect=socket.error()):
             self.hass.config.components = []
-            assert not _setup_component(self.hass, mqtt.DOMAIN, {
-                mqtt.DOMAIN: {
-                    mqtt.CONF_BROKER: 'test-broker',
-                }
-            })
+            assert not setup_component(self.hass, mqtt.DOMAIN, test_broker_cfg)
 
-    def test_setup_protocol_validation(self):
-        """Test for setup failure if connection to broker is missing."""
-        with mock.patch('paho.mqtt.client.Client'):
+        # Ensure if we dont raise it sets up correctly
+        self.hass.config.components = []
+        assert setup_component(self.hass, mqtt.DOMAIN, test_broker_cfg)
+
+    @mock.patch('paho.mqtt.client.Client')
+    def test_setup_embedded(self, _):
+        """Test setting up embedded server with no config."""
+        client_config = ('localhost', 1883, 'user', 'pass', None, '3.1.1')
+
+        with mock.patch('homeassistant.components.mqtt.server.start',
+                        return_value=(True, client_config)) as _start:
             self.hass.config.components = []
-            assert _setup_component(self.hass, mqtt.DOMAIN, {
-                mqtt.DOMAIN: {
-                    mqtt.CONF_BROKER: 'test-broker',
-                    mqtt.CONF_PROTOCOL: 3.1,
-                }
-            })
+            assert setup_component(self.hass, mqtt.DOMAIN,
+                                   {mqtt.DOMAIN: {}})
+            assert _start.call_count == 1
+
+            # Test with `embedded: None`
+            self.hass.config.components = []
+            assert setup_component(self.hass, mqtt.DOMAIN,
+                                   {mqtt.DOMAIN: {'embedded': None}})
+            assert _start.call_count == 2  # Another call
 
     def test_publish_calls_service(self):
         """Test the publishing of call to services."""
@@ -79,11 +92,11 @@ class TestMQTT(unittest.TestCase):
 
         self.assertEqual(1, len(self.calls))
         self.assertEqual(
-                'test-topic',
-                self.calls[0][0].data['service_data'][mqtt.ATTR_TOPIC])
+            'test-topic',
+            self.calls[0][0].data['service_data'][mqtt.ATTR_TOPIC])
         self.assertEqual(
-                'test-payload',
-                self.calls[0][0].data['service_data'][mqtt.ATTR_PAYLOAD])
+            'test-payload',
+            self.calls[0][0].data['service_data'][mqtt.ATTR_PAYLOAD])
 
     def test_service_call_without_topic_does_not_publish(self):
         """Test the service call if topic is missing."""
@@ -217,14 +230,16 @@ class TestMQTTCallbacks(unittest.TestCase):
 
     def setUp(self):  # pylint: disable=invalid-name
         """Setup things to be run when tests are started."""
-        self.hass = get_test_home_assistant(1)
+        self.hass = get_test_home_assistant()
         # mock_mqtt_component(self.hass)
 
         with mock.patch('paho.mqtt.client.Client'):
             self.hass.config.components = []
-            assert _setup_component(self.hass, mqtt.DOMAIN, {
+            assert setup_component(self.hass, mqtt.DOMAIN, {
                 mqtt.DOMAIN: {
                     mqtt.CONF_BROKER: 'mock-broker',
+                    mqtt.CONF_BIRTH_MESSAGE: {mqtt.ATTR_TOPIC: 'birth',
+                                              mqtt.ATTR_PAYLOAD: 'birth'}
                 }
             })
 
@@ -236,6 +251,7 @@ class TestMQTTCallbacks(unittest.TestCase):
         """Test if receiving triggers an event."""
         calls = []
 
+        @callback
         def record(event):
             """Helper to record calls."""
             calls.append(event)
@@ -288,6 +304,13 @@ class TestMQTTCallbacks(unittest.TestCase):
             3: 'home/sensor',
         }, mqtt.MQTT_CLIENT.progress)
 
+    def test_mqtt_birth_message_on_connect(self):  \
+            # pylint: disable=no-self-use
+        """Test birth message on connect."""
+        mqtt.MQTT_CLIENT._mqtt_on_connect(None, None, 0, 0)
+        mqtt.MQTT_CLIENT._mqttc.publish.assert_called_with('birth', 'birth', 0,
+                                                           False)
+
     def test_mqtt_disconnect_tries_no_reconnect_on_stop(self):
         """Test the disconnect tries."""
         mqtt.MQTT_CLIENT._mqtt_on_disconnect(None, None, 0)
@@ -314,5 +337,31 @@ class TestMQTTCallbacks(unittest.TestCase):
         self.assertEqual({}, mqtt.MQTT_CLIENT.progress)
 
     def test_invalid_mqtt_topics(self):
+        """Test invalid topics."""
         self.assertRaises(vol.Invalid, mqtt.valid_publish_topic, 'bad+topic')
         self.assertRaises(vol.Invalid, mqtt.valid_subscribe_topic, 'bad\0one')
+
+    def test_receiving_non_utf8_message_gets_logged(self):
+        """Test receiving a non utf8 encoded message."""
+        calls = []
+
+        @callback
+        def record(event):
+            """Helper to record calls."""
+            calls.append(event)
+
+        payload = 0x9a
+        topic = 'test_topic'
+        self.hass.bus.listen_once(mqtt.EVENT_MQTT_MESSAGE_RECEIVED, record)
+        MQTTMessage = namedtuple('MQTTMessage', ['topic', 'qos', 'payload'])
+        message = MQTTMessage(topic, 1, payload)
+        with self.assertLogs(level='ERROR') as test_handle:
+            mqtt.MQTT_CLIENT._mqtt_on_message(
+                None,
+                {'hass': self.hass},
+                message)
+            self.hass.block_till_done()
+            self.assertIn(
+                "ERROR:homeassistant.components.mqtt:Illegal utf-8 unicode "
+                "payload from MQTT topic: %s, Payload: " % topic,
+                test_handle.output[0])

@@ -36,7 +36,6 @@ def call_from_config(hass: HomeAssistant, config: ConfigType,
 class Script():
     """Representation of a script."""
 
-    # pylint: disable=too-many-instance-attributes
     def __init__(self, hass: HomeAssistant, sequence, name: str=None,
                  change_listener=None) -> None:
         """Initialize the script."""
@@ -86,7 +85,7 @@ class Script():
                 def script_delay(now):
                     """Called after delay is done."""
                     self._async_unsub_delay_listener = None
-                    self.hass.loop.create_task(self.async_run(variables))
+                    self.hass.async_add_job(self.async_run(variables))
 
                 delay = action[CONF_DELAY]
 
@@ -94,7 +93,7 @@ class Script():
                     delay = vol.All(
                         cv.time_period,
                         cv.positive_timedelta)(
-                            delay.async_render())
+                            delay.async_render(variables))
 
                 self._async_unsub_delay_listener = \
                     async_track_point_in_utc_time(

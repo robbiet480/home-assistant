@@ -40,7 +40,6 @@ def get_service(hass, config):
         return None
 
 
-# pylint: disable=too-few-public-methods
 class PushoverNotificationService(BaseNotificationService):
     """Implement the notification service for Pushover."""
 
@@ -62,6 +61,9 @@ class PushoverNotificationService(BaseNotificationService):
         data['title'] = kwargs.get(ATTR_TITLE, ATTR_TITLE_DEFAULT)
 
         targets = kwargs.get(ATTR_TARGET)
+
+        if not isinstance(targets, list):
+            targets = [targets]
 
         for target in targets:
             if target is not None:

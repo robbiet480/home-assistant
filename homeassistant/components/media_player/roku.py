@@ -11,7 +11,7 @@ import voluptuous as vol
 from homeassistant.components.media_player import (
     MEDIA_TYPE_VIDEO, SUPPORT_NEXT_TRACK, SUPPORT_PLAY_MEDIA,
     SUPPORT_PREVIOUS_TRACK, SUPPORT_VOLUME_MUTE, SUPPORT_VOLUME_SET,
-    SUPPORT_SELECT_SOURCE, MediaPlayerDevice, PLATFORM_SCHEMA)
+    SUPPORT_SELECT_SOURCE, SUPPORT_PLAY, MediaPlayerDevice, PLATFORM_SCHEMA)
 from homeassistant.const import (
     CONF_HOST, STATE_IDLE, STATE_PLAYING, STATE_UNKNOWN, STATE_HOME)
 import homeassistant.helpers.config_validation as cv
@@ -27,14 +27,13 @@ _LOGGER = logging.getLogger(__name__)
 
 SUPPORT_ROKU = SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK |\
     SUPPORT_PLAY_MEDIA | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_MUTE |\
-    SUPPORT_SELECT_SOURCE
+    SUPPORT_SELECT_SOURCE | SUPPORT_PLAY
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_HOST): cv.string,
 })
 
 
-# pylint: disable=abstract-method
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup the Roku platform."""
     hosts = []
@@ -65,8 +64,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 class RokuDevice(MediaPlayerDevice):
     """Representation of a Roku device on the network."""
 
-    # pylint: disable=abstract-method
-    # pylint: disable=too-many-public-methods
     def __init__(self, host):
         """Initialize the Roku device."""
         from roku import Roku

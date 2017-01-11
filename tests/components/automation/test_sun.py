@@ -1,9 +1,11 @@
 """The tests for the sun automation."""
 from datetime import datetime
+
 import unittest
 from unittest.mock import patch
 
-from homeassistant.bootstrap import _setup_component
+from homeassistant.core import callback
+from homeassistant.bootstrap import setup_component
 from homeassistant.components import sun
 import homeassistant.components.automation as automation
 import homeassistant.util.dt as dt_util
@@ -11,10 +13,11 @@ import homeassistant.util.dt as dt_util
 from tests.common import fire_time_changed, get_test_home_assistant
 
 
+# pylint: disable=invalid-name
 class TestAutomationSun(unittest.TestCase):
     """Test the sun automation."""
 
-    def setUp(self):  # pylint: disable=invalid-name
+    def setUp(self):
         """Setup things to be run when tests are started."""
         self.hass = get_test_home_assistant()
         self.hass.config.components.append('group')
@@ -22,12 +25,14 @@ class TestAutomationSun(unittest.TestCase):
 
         self.calls = []
 
+        @callback
         def record_call(service):
+            """Call recorder."""
             self.calls.append(service)
 
         self.hass.services.register('test', 'automation', record_call)
 
-    def tearDown(self):  # pylint: disable=invalid-name
+    def tearDown(self):
         """Stop everything that was started."""
         self.hass.stop()
 
@@ -42,7 +47,7 @@ class TestAutomationSun(unittest.TestCase):
 
         with patch('homeassistant.util.dt.utcnow',
                    return_value=now):
-            _setup_component(self.hass, automation.DOMAIN, {
+            setup_component(self.hass, automation.DOMAIN, {
                 automation.DOMAIN: {
                     'trigger': {
                         'platform': 'sun',
@@ -81,7 +86,7 @@ class TestAutomationSun(unittest.TestCase):
 
         with patch('homeassistant.util.dt.utcnow',
                    return_value=now):
-            _setup_component(self.hass, automation.DOMAIN, {
+            setup_component(self.hass, automation.DOMAIN, {
                 automation.DOMAIN: {
                     'trigger': {
                         'platform': 'sun',
@@ -108,7 +113,7 @@ class TestAutomationSun(unittest.TestCase):
 
         with patch('homeassistant.util.dt.utcnow',
                    return_value=now):
-            _setup_component(self.hass, automation.DOMAIN, {
+            setup_component(self.hass, automation.DOMAIN, {
                 automation.DOMAIN: {
                     'trigger': {
                         'platform': 'sun',
@@ -142,7 +147,7 @@ class TestAutomationSun(unittest.TestCase):
 
         with patch('homeassistant.util.dt.utcnow',
                    return_value=now):
-            _setup_component(self.hass, automation.DOMAIN, {
+            setup_component(self.hass, automation.DOMAIN, {
                 automation.DOMAIN: {
                     'trigger': {
                         'platform': 'sun',
@@ -165,7 +170,7 @@ class TestAutomationSun(unittest.TestCase):
             sun.STATE_ATTR_NEXT_RISING: '2015-09-16T14:00:00Z',
         })
 
-        _setup_component(self.hass, automation.DOMAIN, {
+        setup_component(self.hass, automation.DOMAIN, {
             automation.DOMAIN: {
                 'trigger': {
                     'platform': 'event',
@@ -201,7 +206,7 @@ class TestAutomationSun(unittest.TestCase):
             sun.STATE_ATTR_NEXT_RISING: '2015-09-16T14:00:00Z',
         })
 
-        _setup_component(self.hass, automation.DOMAIN, {
+        setup_component(self.hass, automation.DOMAIN, {
             automation.DOMAIN: {
                 'trigger': {
                     'platform': 'event',
@@ -237,7 +242,7 @@ class TestAutomationSun(unittest.TestCase):
             sun.STATE_ATTR_NEXT_RISING: '2015-09-16T14:00:00Z',
         })
 
-        _setup_component(self.hass, automation.DOMAIN, {
+        setup_component(self.hass, automation.DOMAIN, {
             automation.DOMAIN: {
                 'trigger': {
                     'platform': 'event',
@@ -274,7 +279,7 @@ class TestAutomationSun(unittest.TestCase):
             sun.STATE_ATTR_NEXT_RISING: '2015-09-16T14:00:00Z',
         })
 
-        _setup_component(self.hass, automation.DOMAIN, {
+        setup_component(self.hass, automation.DOMAIN, {
             automation.DOMAIN: {
                 'trigger': {
                     'platform': 'event',
@@ -312,7 +317,7 @@ class TestAutomationSun(unittest.TestCase):
             sun.STATE_ATTR_NEXT_SETTING: '2015-09-16T15:00:00Z',
         })
 
-        _setup_component(self.hass, automation.DOMAIN, {
+        setup_component(self.hass, automation.DOMAIN, {
             automation.DOMAIN: {
                 'trigger': {
                     'platform': 'event',
@@ -358,7 +363,7 @@ class TestAutomationSun(unittest.TestCase):
             sun.STATE_ATTR_NEXT_SETTING: '2015-09-16T17:30:00Z',
         })
 
-        _setup_component(self.hass, automation.DOMAIN, {
+        setup_component(self.hass, automation.DOMAIN, {
             automation.DOMAIN: {
                 'trigger': {
                     'platform': 'event',

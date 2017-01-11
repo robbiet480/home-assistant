@@ -1,6 +1,5 @@
 """Test event helpers."""
-# pylint: disable=protected-access,too-many-public-methods
-# pylint: disable=too-few-public-methods
+# pylint: disable=protected-access
 import asyncio
 import unittest
 from datetime import datetime, timedelta
@@ -16,6 +15,7 @@ from homeassistant.helpers.event import (
     track_utc_time_change,
     track_time_change,
     track_state_change,
+    track_time_interval,
     track_sunrise,
     track_sunset,
 )
@@ -28,11 +28,13 @@ from tests.common import get_test_home_assistant
 class TestEventHelpers(unittest.TestCase):
     """Test the Home Assistant event helpers."""
 
-    def setUp(self):     # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def setUp(self):
         """Setup things to be run when tests are started."""
         self.hass = get_test_home_assistant()
 
-    def tearDown(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def tearDown(self):
         """Stop everything that was started."""
         self.hass.stop()
 
@@ -185,6 +187,34 @@ class TestEventHelpers(unittest.TestCase):
         self.assertEqual(1, len(specific_runs))
         self.assertEqual(5, len(wildcard_runs))
         self.assertEqual(6, len(wildercard_runs))
+
+    def test_track_time_interval(self):
+        """Test tracking time interval."""
+        specific_runs = []
+
+        utc_now = dt_util.utcnow()
+        unsub = track_time_interval(
+            self.hass, lambda x: specific_runs.append(1),
+            timedelta(seconds=10)
+        )
+
+        self._send_time_changed(utc_now + timedelta(seconds=5))
+        self.hass.block_till_done()
+        self.assertEqual(0, len(specific_runs))
+
+        self._send_time_changed(utc_now + timedelta(seconds=13))
+        self.hass.block_till_done()
+        self.assertEqual(1, len(specific_runs))
+
+        self._send_time_changed(utc_now + timedelta(minutes=20))
+        self.hass.block_till_done()
+        self.assertEqual(2, len(specific_runs))
+
+        unsub()
+
+        self._send_time_changed(utc_now + timedelta(seconds=30))
+        self.hass.block_till_done()
+        self.assertEqual(2, len(specific_runs))
 
     def test_track_sunrise(self):
         """Test track the sunrise."""

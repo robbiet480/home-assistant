@@ -10,7 +10,8 @@ from datetime import timedelta
 import voluptuous as vol
 
 import homeassistant.helpers.config_validation as cv
-from homeassistant.components.device_tracker import DOMAIN, PLATFORM_SCHEMA
+from homeassistant.components.device_tracker import (
+    DOMAIN, PLATFORM_SCHEMA, DeviceScanner)
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.util import Throttle
 
@@ -38,8 +39,7 @@ def get_scanner(hass, config):
     return scanner if scanner.success_init else None
 
 
-# pylint: disable=too-many-instance-attributes
-class FritzBoxScanner(object):
+class FritzBoxScanner(DeviceScanner):
     """This class queries a FRITZ!Box router."""
 
     def __init__(self, config):
@@ -79,7 +79,7 @@ class FritzBoxScanner(object):
         self._update_info()
         active_hosts = []
         for known_host in self.last_results:
-            if known_host['status'] == '1':
+            if known_host['status'] == '1' and known_host.get('mac'):
                 active_hosts.append(known_host['mac'])
         return active_hosts
 

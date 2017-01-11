@@ -101,8 +101,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 class MqttLight(Light):
     """MQTT light."""
 
-    # pylint: disable=too-many-arguments,too-many-instance-attributes
-    # pylint: disable=too-many-locals,too-many-branches
     def __init__(self, hass, name, topic, templates, qos, retain, payload,
                  optimistic, brightness_scale):
         """Initialize MQTT light."""
@@ -285,7 +283,7 @@ class MqttLight(Light):
             should_update = True
 
         if should_update:
-            self.update_ha_state()
+            self.schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
@@ -295,4 +293,4 @@ class MqttLight(Light):
         if self._optimistic:
             # Optimistically assume that switch has changed state.
             self._state = False
-            self.update_ha_state()
+            self.schedule_update_ha_state()

@@ -11,7 +11,7 @@ import voluptuous as vol
 
 from homeassistant.components.media_player import (
     MEDIA_TYPE_MUSIC, MEDIA_TYPE_PLAYLIST, SUPPORT_NEXT_TRACK, SUPPORT_PAUSE,
-    SUPPORT_PREVIOUS_TRACK, SUPPORT_TURN_OFF, SUPPORT_TURN_ON,
+    SUPPORT_PREVIOUS_TRACK, SUPPORT_TURN_OFF, SUPPORT_TURN_ON, SUPPORT_PLAY,
     SUPPORT_VOLUME_SET, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK, PLATFORM_SCHEMA,
     MediaPlayerDevice)
 from homeassistant.const import (
@@ -28,7 +28,7 @@ DEFAULT_PORT = 3000
 
 SUPPORT_CMUS = SUPPORT_PAUSE | SUPPORT_VOLUME_SET | SUPPORT_TURN_OFF |  \
     SUPPORT_TURN_ON | SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK | \
-    SUPPORT_PLAY_MEDIA | SUPPORT_SEEK
+    SUPPORT_PLAY_MEDIA | SUPPORT_SEEK | SUPPORT_PLAY
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Inclusive(CONF_HOST, 'remote'): cv.string,
@@ -58,7 +58,7 @@ def setup_platform(hass, config, add_devices, discover_info=None):
 class CmusDevice(MediaPlayerDevice):
     """Representation of a running cmus."""
 
-    # pylint: disable=no-member, too-many-public-methods, abstract-method
+    # pylint: disable=no-member
     def __init__(self, server, password, port, name):
         """Initialize the CMUS device."""
         from pycmus import remote

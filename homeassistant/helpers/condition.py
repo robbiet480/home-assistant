@@ -131,7 +131,6 @@ def async_or_from_config(config: ConfigType, config_validation: bool=True):
 or_from_config = _threaded_factory(async_or_from_config)
 
 
-# pylint: disable=too-many-arguments
 def numeric_state(hass: HomeAssistant, entity, below=None, above=None,
                   value_template=None, variables=None):
     """Test a numeric state condition."""
@@ -283,7 +282,7 @@ def async_template(hass, value_template, variables=None):
     try:
         value = value_template.async_render(variables)
     except TemplateError as ex:
-        _LOGGER.error('Error duriong template condition: %s', ex)
+        _LOGGER.error('Error during template condition: %s', ex)
         return False
 
     return value.lower() == 'true'

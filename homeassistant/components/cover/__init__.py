@@ -5,6 +5,7 @@ For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/cover/
 """
 import os
+from datetime import timedelta
 import logging
 
 import voluptuous as vol
@@ -23,7 +24,7 @@ from homeassistant.const import (
 
 
 DOMAIN = 'cover'
-SCAN_INTERVAL = 15
+SCAN_INTERVAL = timedelta(seconds=15)
 
 GROUP_NAME_ALL_COVERS = 'all covers'
 ENTITY_ID_ALL_COVERS = group.ENTITY_ID_FORMAT.format('all_covers')
@@ -135,12 +136,19 @@ def setup(hass, config):
         params = service.data.copy()
         params.pop(ATTR_ENTITY_ID, None)
 
-        if method:
-            for cover in component.extract_from_service(service):
-                getattr(cover, method['method'])(**params)
+        if not method:
+            return
 
-                if cover.should_poll:
-                    cover.update_ha_state(True)
+        covers = component.extract_from_service(service)
+
+        for cover in covers:
+            getattr(cover, method['method'])(**params)
+
+        for cover in covers:
+            if not cover.should_poll:
+                continue
+
+            cover.update_ha_state(True)
 
     descriptions = load_yaml_config_file(
         os.path.join(os.path.dirname(__file__), 'services.yaml'))

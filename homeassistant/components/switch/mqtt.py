@@ -8,6 +8,7 @@ import logging
 
 import voluptuous as vol
 
+from homeassistant.core import callback
 from homeassistant.components.mqtt import (
     CONF_STATE_TOPIC, CONF_COMMAND_TOPIC, CONF_QOS, CONF_RETAIN)
 from homeassistant.components.switch import SwitchDevice
@@ -54,7 +55,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     )])
 
 
-# pylint: disable=too-many-arguments, too-many-instance-attributes
 class MqttSwitch(SwitchDevice):
     """Representation of a switch that can be toggled using MQTT."""
 
@@ -72,17 +72,18 @@ class MqttSwitch(SwitchDevice):
         self._payload_off = payload_off
         self._optimistic = optimistic
 
+        @callback
         def message_received(topic, payload, qos):
             """A new MQTT message has been received."""
             if value_template is not None:
-                payload = value_template.render_with_possible_json_value(
+                payload = value_template.async_render_with_possible_json_value(
                     payload)
             if payload == self._payload_on:
                 self._state = True
-                self.update_ha_state()
+                hass.async_add_job(self.async_update_ha_state())
             elif payload == self._payload_off:
                 self._state = False
-                self.update_ha_state()
+                hass.async_add_job(self.async_update_ha_state())
 
         if self._state_topic is None:
             # Force into optimistic mode.

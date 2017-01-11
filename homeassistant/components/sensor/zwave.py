@@ -4,6 +4,7 @@ Interfaces with Z-Wave sensors.
 For more details about this platform, please refer to the documentation
 at https://home-assistant.io/components/sensor.zwave/
 """
+import logging
 # Because we do not compile openzwave on CI
 # pylint: disable=import-error
 from homeassistant.components.sensor import DOMAIN
@@ -11,19 +12,7 @@ from homeassistant.components import zwave
 from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
 from homeassistant.helpers.entity import Entity
 
-
-FIBARO = 0x010f
-FIBARO_WALL_PLUG = 0x1000
-FIBARO_WALL_PLUG_SENSOR_METER = (FIBARO, FIBARO_WALL_PLUG, 8)
-
-WORKAROUND_IGNORE = 'ignore'
-
-DEVICE_MAPPINGS = {
-    # For some reason Fibaro Wall Plug reports 2 power consumptions.
-    # One value updates as the power consumption changes
-    # and the other does not change.
-    FIBARO_WALL_PLUG_SENSOR_METER: WORKAROUND_IGNORE,
-}
+_LOGGER = logging.getLogger(__name__)
 
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
@@ -45,18 +34,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     # if 1 in groups and (NETWORK.controller.node_id not in
     #                     groups[1].associations):
     #     node.groups[1].add_association(NETWORK.controller.node_id)
-
-    # Make sure that we have values for the key before converting to int
-    if (value.node.manufacturer_id.strip() and
-            value.node.product_id.strip()):
-        specific_sensor_key = (int(value.node.manufacturer_id, 16),
-                               int(value.node.product_id, 16),
-                               value.index)
-
-        # Check workaround mappings for specific devices.
-        if specific_sensor_key in DEVICE_MAPPINGS:
-            if DEVICE_MAPPINGS[specific_sensor_key] == WORKAROUND_IGNORE:
-                return
 
     # Generic Device mappings
     if node.has_command_class(zwave.const.COMMAND_CLASS_SENSOR_MULTILEVEL):
@@ -98,7 +75,8 @@ class ZWaveSensor(zwave.ZWaveDeviceEntity, Entity):
         """Called when a value has changed on the network."""
         if self._value.value_id == value.value_id or \
            self._value.node == value.node:
-            self.update_ha_state()
+            _LOGGER.debug('Value changed for label %s', self._value.label)
+            self.schedule_update_ha_state()
 
 
 class ZWaveMultilevelSensor(ZWaveSensor):

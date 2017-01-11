@@ -4,9 +4,12 @@ Support for the Locative platform.
 For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/device_tracker.locative/
 """
+import asyncio
+from functools import partial
 import logging
 
-from homeassistant.const import HTTP_UNPROCESSABLE_ENTITY, STATE_NOT_HOME
+from homeassistant.const import (
+    ATTR_LATITUDE, ATTR_LONGITUDE, STATE_NOT_HOME, HTTP_UNPROCESSABLE_ENTITY)
 from homeassistant.components.http import HomeAssistantView
 # pylint: disable=unused-import
 from homeassistant.components.device_tracker import (  # NOQA
@@ -19,7 +22,7 @@ DEPENDENCIES = ['http']
 
 def setup_scanner(hass, config, see):
     """Setup an endpoint for the Locative application."""
-    hass.wsgi.register_view(LocativeView(hass, see))
+    hass.http.register_view(LocativeView(see))
 
     return True
 
@@ -30,20 +33,27 @@ class LocativeView(HomeAssistantView):
     url = '/api/locative'
     name = 'api:locative'
 
-    def __init__(self, hass, see):
+    def __init__(self, see):
         """Initialize Locative url endpoints."""
-        super().__init__(hass)
         self.see = see
 
+    @asyncio.coroutine
     def get(self, request):
         """Locative message received as GET."""
-        return self.post(request)
+        res = yield from self._handle(request.app['hass'], request.GET)
+        return res
 
+    @asyncio.coroutine
     def post(self, request):
         """Locative message received."""
-        # pylint: disable=too-many-return-statements
-        data = request.values
+        data = yield from request.post()
+        res = yield from self._handle(request.app['hass'], data)
+        return res
 
+    @asyncio.coroutine
+    # pylint: disable=too-many-return-statements
+    def _handle(self, hass, data):
+        """Handle locative request."""
         if 'latitude' not in data or 'longitude' not in data:
             return ('Latitude and longitude not specified.',
                     HTTP_UNPROCESSABLE_ENTITY)
@@ -53,30 +63,38 @@ class LocativeView(HomeAssistantView):
             return ('Device id not specified.',
                     HTTP_UNPROCESSABLE_ENTITY)
 
-        if 'id' not in data:
-            _LOGGER.error('Location id not specified.')
-            return ('Location id not specified.',
-                    HTTP_UNPROCESSABLE_ENTITY)
-
         if 'trigger' not in data:
             _LOGGER.error('Trigger is not specified.')
             return ('Trigger is not specified.',
                     HTTP_UNPROCESSABLE_ENTITY)
 
+        if 'id' not in data and data['trigger'] != 'test':
+            _LOGGER.error('Location id not specified.')
+            return ('Location id not specified.',
+                    HTTP_UNPROCESSABLE_ENTITY)
+
         device = data['device'].replace('-', '')
-        location_name = data['id'].lower()
+        location_name = data.get('id', data['trigger']).lower()
         direction = data['trigger']
+        gps_location = (data[ATTR_LATITUDE], data[ATTR_LONGITUDE])
 
         if direction == 'enter':
-            self.see(dev_id=device, location_name=location_name)
+            yield from hass.loop.run_in_executor(
+                None, partial(self.see, dev_id=device,
+                              location_name=location_name,
+                              gps=gps_location))
             return 'Setting location to {}'.format(location_name)
 
         elif direction == 'exit':
-            current_state = self.hass.states.get(
+            current_state = hass.states.get(
                 '{}.{}'.format(DOMAIN, device))
 
             if current_state is None or current_state.state == location_name:
-                self.see(dev_id=device, location_name=STATE_NOT_HOME)
+                location_name = STATE_NOT_HOME
+                yield from hass.loop.run_in_executor(
+                    None, partial(self.see, dev_id=device,
+                                  location_name=location_name,
+                                  gps=gps_location))
                 return 'Setting location to not home'
             else:
                 # Ignore the message if it is telling us to exit a zone that we

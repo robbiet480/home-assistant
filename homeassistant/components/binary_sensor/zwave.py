@@ -20,6 +20,8 @@ DEPENDENCIES = []
 PHILIO = 0x013c
 PHILIO_SLIM_SENSOR = 0x0002
 PHILIO_SLIM_SENSOR_MOTION = (PHILIO, PHILIO_SLIM_SENSOR, 0)
+PHILIO_3_IN_1_SENSOR_GEN_4 = 0x000d
+PHILIO_3_IN_1_SENSOR_GEN_4_MOTION = (PHILIO, PHILIO_3_IN_1_SENSOR_GEN_4, 0)
 WENZHOU = 0x0118
 WENZHOU_SLIM_SENSOR_MOTION = (WENZHOU, PHILIO_SLIM_SENSOR, 0)
 
@@ -27,6 +29,7 @@ WORKAROUND_NO_OFF_EVENT = 'trigger_no_off_event'
 
 DEVICE_MAPPINGS = {
     PHILIO_SLIM_SENSOR_MOTION: WORKAROUND_NO_OFF_EVENT,
+    PHILIO_3_IN_1_SENSOR_GEN_4_MOTION: WORKAROUND_NO_OFF_EVENT,
     WENZHOU_SLIM_SENSOR_MOTION: WORKAROUND_NO_OFF_EVENT,
 }
 
@@ -96,7 +99,8 @@ class ZWaveBinarySensor(BinarySensorDevice, zwave.ZWaveDeviceEntity, Entity):
         """Called when a value has changed on the network."""
         if self._value.value_id == value.value_id or \
            self._value.node == value.node:
-            self.update_ha_state()
+            _LOGGER.debug('Value changed for label %s', self._value.label)
+            self.schedule_update_ha_state()
 
 
 class ZWaveTriggerSensor(ZWaveBinarySensor, Entity):
@@ -112,19 +116,19 @@ class ZWaveTriggerSensor(ZWaveBinarySensor, Entity):
         # If it's active make sure that we set the timeout tracker
         if sensor_value.data:
             track_point_in_time(
-                self._hass, self.update_ha_state,
+                self._hass, self.async_update_ha_state,
                 self.invalidate_after)
 
     def value_changed(self, value):
         """Called when a value has changed on the network."""
         if self._value.value_id == value.value_id:
-            self.update_ha_state()
+            self.schedule_update_ha_state()
             if value.data:
                 # only allow this value to be true for re_arm secs
                 self.invalidate_after = dt_util.utcnow() + datetime.timedelta(
                     seconds=self.re_arm_sec)
                 track_point_in_time(
-                    self._hass, self.update_ha_state,
+                    self._hass, self.async_update_ha_state,
                     self.invalidate_after)
 
     @property

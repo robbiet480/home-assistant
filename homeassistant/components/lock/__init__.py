@@ -21,7 +21,7 @@ from homeassistant.const import (
 from homeassistant.components import group
 
 DOMAIN = 'lock'
-SCAN_INTERVAL = 30
+SCAN_INTERVAL = timedelta(seconds=30)
 ATTR_CHANGED_BY = 'changed_by'
 
 GROUP_NAME_ALL_LOCKS = 'all locks'
@@ -85,8 +85,11 @@ def setup(hass, config):
             else:
                 item.unlock(code=code)
 
-            if item.should_poll:
-                item.update_ha_state(True)
+        for item in target_locks:
+            if not item.should_poll:
+                continue
+
+            item.update_ha_state(True)
 
     descriptions = load_yaml_config_file(
         os.path.join(os.path.dirname(__file__), 'services.yaml'))

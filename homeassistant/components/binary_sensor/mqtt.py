@@ -8,6 +8,7 @@ import logging
 
 import voluptuous as vol
 
+from homeassistant.core import callback
 import homeassistant.components.mqtt as mqtt
 from homeassistant.components.binary_sensor import (
     BinarySensorDevice, SENSOR_CLASSES)
@@ -51,7 +52,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     )])
 
 
-# pylint: disable=too-many-arguments, too-many-instance-attributes
 class MqttBinarySensor(BinarySensorDevice):
     """Representation a binary sensor that is updated by MQTT."""
 
@@ -67,17 +67,18 @@ class MqttBinarySensor(BinarySensorDevice):
         self._payload_off = payload_off
         self._qos = qos
 
+        @callback
         def message_received(topic, payload, qos):
             """A new MQTT message has been received."""
             if value_template is not None:
-                payload = value_template.render_with_possible_json_value(
+                payload = value_template.async_render_with_possible_json_value(
                     payload)
             if payload == self._payload_on:
                 self._state = True
-                self.update_ha_state()
+                hass.async_add_job(self.async_update_ha_state())
             elif payload == self._payload_off:
                 self._state = False
-                self.update_ha_state()
+                hass.async_add_job(self.async_update_ha_state())
 
         mqtt.subscribe(hass, self._state_topic, message_received, self._qos)
 

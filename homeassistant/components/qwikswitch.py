@@ -15,8 +15,7 @@ from homeassistant.components.light import (ATTR_BRIGHTNESS,
 from homeassistant.components.switch import SwitchDevice
 
 DOMAIN = 'qwikswitch'
-REQUIREMENTS = ['https://github.com/kellerza/pyqwikswitch/archive/v0.4.zip'
-                '#pyqwikswitch==0.4']
+REQUIREMENTS = ['pyqwikswitch==0.4']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,7 +116,6 @@ class QSLight(QSToggleEntity, Light):
         return SUPPORT_QWIKSWITCH
 
 
-# pylint: disable=too-many-locals
 def setup(hass, config):
     """Setup the QSUSB component."""
     from pyqwikswitch import (QSUsb, CMD_BUTTONS, QS_NAME, QS_ID, QS_CMD,

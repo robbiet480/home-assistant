@@ -1,6 +1,10 @@
 """Z-Wave Constants."""
 
 ATTR_NODE_ID = "node_id"
+ATTR_TARGET_NODE_ID = "target_node_id"
+ATTR_ASSOCIATION = "association"
+ATTR_INSTANCE = "instance"
+ATTR_GROUP = "group"
 ATTR_VALUE_ID = "value_id"
 ATTR_OBJECT_ID = "object_id"
 ATTR_NAME = "name"
@@ -11,6 +15,7 @@ ATTR_CONFIG_SIZE = "size"
 ATTR_CONFIG_VALUE = "value"
 NETWORK_READY_WAIT_SECS = 30
 
+SERVICE_CHANGE_ASSOCIATION = "change_association"
 SERVICE_ADD_NODE = "add_node"
 SERVICE_ADD_NODE_SECURE = "add_node_secure"
 SERVICE_REMOVE_NODE = "remove_node"
@@ -19,6 +24,7 @@ SERVICE_HEAL_NETWORK = "heal_network"
 SERVICE_SOFT_RESET = "soft_reset"
 SERVICE_TEST_NETWORK = "test_network"
 SERVICE_SET_CONFIG_PARAMETER = "set_config_parameter"
+SERVICE_PRINT_CONFIG_PARAMETER = "print_config_parameter"
 SERVICE_STOP_NETWORK = "stop_network"
 SERVICE_START_NETWORK = "start_network"
 SERVICE_RENAME_NODE = "rename_node"
@@ -289,8 +295,11 @@ SPECIFIC_TYPE_NOTIFICATION_SENSOR = 1
 
 GENRE_WHATEVER = None
 GENRE_USER = "User"
+GENRE_SYSTEM = "System"
 
 TYPE_WHATEVER = None
 TYPE_BYTE = "Byte"
 TYPE_BOOL = "Bool"
 TYPE_DECIMAL = "Decimal"
+TYPE_INT = "Int"
+TYPE_LIST = "List"

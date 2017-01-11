@@ -15,7 +15,7 @@ from homeassistant.util import Throttle
 from homeassistant.helpers.entity import Entity
 import homeassistant.util.dt as dt_util
 
-REQUIREMENTS = ['schiene==0.17']
+REQUIREMENTS = ['schiene==0.18']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     add_devices([DeutscheBahnSensor(start, destination)])
 
 
-# pylint: disable=too-few-public-methods
 class DeutscheBahnSensor(Entity):
     """Implementation of a Deutsche Bahn sensor."""
 
@@ -81,7 +80,6 @@ class DeutscheBahnSensor(Entity):
             self._state += " + {}".format(self.data.connections[0]['delay'])
 
 
-# pylint: disable=too-few-public-methods
 class SchieneData(object):
     """Pull data from the bahn.de web page."""
 

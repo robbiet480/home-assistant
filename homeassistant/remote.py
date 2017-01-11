@@ -8,6 +8,7 @@ For more details about the Python API, please refer to the documentation at
 https://home-assistant.io/developers/python_api/
 """
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import enum
 import json
@@ -39,7 +40,7 @@ _LOGGER = logging.getLogger(__name__)
 class APIStatus(enum.Enum):
     """Represent API status."""
 
-    # pylint: disable=no-init,invalid-name,too-few-public-methods
+    # pylint: disable=no-init, invalid-name
     OK = "ok"
     INVALID_PASSWORD = "invalid_password"
     CANNOT_CONNECT = "cannot_connect"
@@ -53,17 +54,21 @@ class APIStatus(enum.Enum):
 class API(object):
     """Object to pass around Home Assistant API location and credentials."""
 
-    # pylint: disable=too-few-public-methods
     def __init__(self, host: str, api_password: Optional[str]=None,
-                 port: Optional[int]=None, use_ssl: bool=False) -> None:
+                 port: Optional[int]=SERVER_PORT, use_ssl: bool=False) -> None:
         """Initalize the API."""
         self.host = host
-        self.port = port or SERVER_PORT
+        self.port = port
         self.api_password = api_password
+
         if use_ssl:
-            self.base_url = "https://{}:{}".format(host, self.port)
+            self.base_url = "https://{}".format(host)
         else:
-            self.base_url = "http://{}:{}".format(host, self.port)
+            self.base_url = "http://{}".format(host)
+
+        if port is not None:
+            self.base_url += ':{}'.format(port)
+
         self.status = None
         self._headers = {
             HTTP_HEADER_CONTENT_TYPE: CONTENT_TYPE_JSON,
@@ -106,14 +111,14 @@ class API(object):
 
     def __repr__(self) -> str:
         """Return the representation of the API."""
-        return "API({}, {}, {})".format(
-            self.host, self.api_password, self.port)
+        return "<API({}, password: {})>".format(
+            self.base_url, 'yes' if self.api_password is not None else 'no')
 
 
 class HomeAssistant(ha.HomeAssistant):
     """Home Assistant that forwards work."""
 
-    # pylint: disable=super-init-not-called,too-many-instance-attributes
+    # pylint: disable=super-init-not-called
     def __init__(self, remote_api, local_api=None, loop=None):
         """Initalize the forward instance."""
         if not remote_api.validate_api():
@@ -124,14 +129,20 @@ class HomeAssistant(ha.HomeAssistant):
         self.remote_api = remote_api
 
         self.loop = loop or asyncio.get_event_loop()
-        self.pool = pool = ha.create_worker_pool()
+        self.executor = ThreadPoolExecutor(max_workers=5)
+        self.loop.set_default_executor(self.executor)
+        self.loop.set_exception_handler(self._async_exception_handler)
+        self._pending_tasks = []
+        self._pending_sheduler = None
 
-        self.bus = EventBus(remote_api, pool, self.loop)
-        self.services = ha.ServiceRegistry(self.bus, self.add_job, self.loop)
+        self.bus = EventBus(remote_api, self)
+        self.services = ha.ServiceRegistry(self)
         self.states = StateMachine(self.bus, self.loop, self.remote_api)
         self.config = ha.Config()
+        # This is a dictionary that any component can store any data on.
+        self.data = {}
         self.state = ha.CoreState.not_running
-
+        self.exit_code = None
         self.config.api = local_api
 
     def start(self):
@@ -143,7 +154,8 @@ class HomeAssistant(ha.HomeAssistant):
                     'Unable to setup local API to receive events')
 
         self.state = ha.CoreState.starting
-        ha.async_create_timer(self)
+        # pylint: disable=protected-access
+        ha._async_create_timer(self)
 
         self.bus.fire(ha.EVENT_HOMEASSISTANT_START,
                       origin=ha.EventOrigin.remote)
@@ -169,8 +181,6 @@ class HomeAssistant(ha.HomeAssistant):
         self.bus.fire(ha.EVENT_HOMEASSISTANT_STOP,
                       origin=ha.EventOrigin.remote)
 
-        self.pool.stop()
-
         # Disconnect master event forwarding
         disconnect_remote_events(self.remote_api, self.config.api)
         self.state = ha.CoreState.not_running
@@ -179,10 +189,9 @@ class HomeAssistant(ha.HomeAssistant):
 class EventBus(ha.EventBus):
     """EventBus implementation that forwards fire_event to remote API."""
 
-    # pylint: disable=too-few-public-methods
-    def __init__(self, api, pool, loop):
+    def __init__(self, api, hass):
         """Initalize the eventbus."""
-        super().__init__(pool, loop)
+        super().__init__(hass)
         self._api = api
 
     def fire(self, event_type, event_data=None, origin=ha.EventOrigin.local):
@@ -213,35 +222,35 @@ class EventForwarder(object):
         self._targets = {}
 
         self._lock = threading.Lock()
-        self._unsub_listener = None
+        self._async_unsub_listener = None
 
-    def connect(self, api):
+    @ha.callback
+    def async_connect(self, api):
         """Attach to a Home Assistant instance and forward events.
 
         Will overwrite old target if one exists with same host/port.
         """
-        with self._lock:
-            if self._unsub_listener is None:
-                self._unsub_listener = self.hass.bus.listen(
-                    ha.MATCH_ALL, self._event_listener)
+        if self._async_unsub_listener is None:
+            self._async_unsub_listener = self.hass.bus.async_listen(
+                ha.MATCH_ALL, self._event_listener)
 
-            key = (api.host, api.port)
+        key = (api.host, api.port)
 
-            self._targets[key] = api
+        self._targets[key] = api
 
-    def disconnect(self, api):
+    @ha.callback
+    def async_disconnect(self, api):
         """Remove target from being forwarded to."""
-        with self._lock:
-            key = (api.host, api.port)
+        key = (api.host, api.port)
 
-            did_remove = self._targets.pop(key, None) is None
+        did_remove = self._targets.pop(key, None) is None
 
-            if len(self._targets) == 0:
-                # Remove event listener if no forwarding targets present
-                self._unsub_listener()
-                self._unsub_listener = None
+        if len(self._targets) == 0:
+            # Remove event listener if no forwarding targets present
+            self._async_unsub_listener()
+            self._async_unsub_listener = None
 
-            return did_remove
+        return did_remove
 
     def _event_listener(self, event):
         """Listen and forward all events."""
@@ -293,7 +302,7 @@ class StateMachine(ha.StateMachine):
 class JSONEncoder(json.JSONEncoder):
     """JSONEncoder that supports Home Assistant objects."""
 
-    # pylint: disable=too-few-public-methods,method-hidden
+    # pylint: disable=method-hidden
     def default(self, obj):
         """Convert Home Assistant objects.
 

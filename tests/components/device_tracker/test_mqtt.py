@@ -4,7 +4,7 @@ from unittest.mock import patch
 import logging
 import os
 
-from homeassistant.bootstrap import _setup_component
+from homeassistant.bootstrap import setup_component
 from homeassistant.components import device_tracker
 from homeassistant.const import CONF_PLATFORM
 
@@ -24,6 +24,7 @@ class TestComponentsDeviceTrackerMQTT(unittest.TestCase):
 
     def tearDown(self):  # pylint: disable=invalid-name
         """Stop everything that was started."""
+        self.hass.stop()
         try:
             os.remove(self.hass.config.path(device_tracker.YAML_DEVICES))
         except FileNotFoundError:
@@ -37,12 +38,13 @@ class TestComponentsDeviceTrackerMQTT(unittest.TestCase):
             self.assertTrue('qos' in config)
 
         with patch('homeassistant.components.device_tracker.mqtt.'
-                   'setup_scanner', side_effect=mock_setup_scanner) as mock_sp:
+                   'setup_scanner', autospec=True,
+                   side_effect=mock_setup_scanner) as mock_sp:
 
             dev_id = 'paulus'
             topic = '/location/paulus'
             self.hass.config.components = ['mqtt', 'zone']
-            assert _setup_component(self.hass, device_tracker.DOMAIN, {
+            assert setup_component(self.hass, device_tracker.DOMAIN, {
                 device_tracker.DOMAIN: {
                     CONF_PLATFORM: 'mqtt',
                     'devices': {dev_id: topic}
@@ -58,7 +60,7 @@ class TestComponentsDeviceTrackerMQTT(unittest.TestCase):
         location = 'work'
 
         self.hass.config.components = ['mqtt', 'zone']
-        assert _setup_component(self.hass, device_tracker.DOMAIN, {
+        assert setup_component(self.hass, device_tracker.DOMAIN, {
             device_tracker.DOMAIN: {
                 CONF_PLATFORM: 'mqtt',
                 'devices': {dev_id: topic}

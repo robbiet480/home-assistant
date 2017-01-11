@@ -1,12 +1,12 @@
 """The tests for the Input select component."""
-# pylint: disable=too-many-public-methods,protected-access
+# pylint: disable=protected-access
 import unittest
 
 from tests.common import get_test_home_assistant
 
 from homeassistant.bootstrap import setup_component
 from homeassistant.components.input_select import (
-    ATTR_OPTIONS, DOMAIN, select_option)
+    ATTR_OPTIONS, DOMAIN, select_option, select_next, select_previous)
 from homeassistant.const import (
     ATTR_ICON, ATTR_FRIENDLY_NAME)
 
@@ -14,11 +14,13 @@ from homeassistant.const import (
 class TestInputSelect(unittest.TestCase):
     """Test the input select component."""
 
-    def setUp(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def setUp(self):
         """Setup things to be run when tests are started."""
         self.hass = get_test_home_assistant()
 
-    def tearDown(self):  # pylint: disable=invalid-name
+    # pylint: disable=invalid-name
+    def tearDown(self):
         """Stop everything that was started."""
         self.hass.stop()
 
@@ -66,6 +68,66 @@ class TestInputSelect(unittest.TestCase):
 
         state = self.hass.states.get(entity_id)
         self.assertEqual('another option', state.state)
+
+    def test_select_next(self):
+        """Test select_next methods."""
+        self.assertTrue(
+            setup_component(self.hass, DOMAIN, {DOMAIN: {
+                'test_1': {
+                    'options': [
+                        'first option',
+                        'middle option',
+                        'last option',
+                    ],
+                    'initial': 'middle option',
+                },
+            }}))
+        entity_id = 'input_select.test_1'
+
+        state = self.hass.states.get(entity_id)
+        self.assertEqual('middle option', state.state)
+
+        select_next(self.hass, entity_id)
+        self.hass.block_till_done()
+
+        state = self.hass.states.get(entity_id)
+        self.assertEqual('last option', state.state)
+
+        select_next(self.hass, entity_id)
+        self.hass.block_till_done()
+
+        state = self.hass.states.get(entity_id)
+        self.assertEqual('first option', state.state)
+
+    def test_select_previous(self):
+        """Test select_previous methods."""
+        self.assertTrue(
+            setup_component(self.hass, DOMAIN, {DOMAIN: {
+                'test_1': {
+                    'options': [
+                        'first option',
+                        'middle option',
+                        'last option',
+                    ],
+                    'initial': 'middle option',
+                },
+            }}))
+        entity_id = 'input_select.test_1'
+
+        state = self.hass.states.get(entity_id)
+        self.assertEqual('middle option', state.state)
+
+        select_previous(self.hass, entity_id)
+        self.hass.block_till_done()
+
+        state = self.hass.states.get(entity_id)
+        self.assertEqual('first option', state.state)
+
+        select_previous(self.hass, entity_id)
+        self.hass.block_till_done()
+
+        state = self.hass.states.get(entity_id)
+        self.assertEqual('last option', state.state)
 
     def test_config_options(self):
         """Test configuration options."""

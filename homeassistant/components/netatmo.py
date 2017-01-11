@@ -1,5 +1,5 @@
 """
-Support for the Netatmo devices (Weather Station and Welcome camera).
+Support for the Netatmo devices.
 
 For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/netatmo/
@@ -18,7 +18,7 @@ from homeassistant.util import Throttle
 
 REQUIREMENTS = [
     'https://github.com/jabesq/netatmo-api-python/archive/'
-    'v0.6.0.zip#lnetatmo==0.6.0']
+    'v0.8.1.zip#lnetatmo==0.8.1']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ NETATMO_AUTH = None
 DEFAULT_DISCOVERY = True
 
 MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=10)
+MIN_TIME_BETWEEN_EVENT_UPDATES = timedelta(seconds=10)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -51,13 +52,14 @@ def setup(hass, config):
         NETATMO_AUTH = lnetatmo.ClientAuth(
             config[DOMAIN][CONF_API_KEY], config[DOMAIN][CONF_SECRET_KEY],
             config[DOMAIN][CONF_USERNAME], config[DOMAIN][CONF_PASSWORD],
-            'read_station read_camera access_camera')
+            'read_station read_camera access_camera '
+            'read_thermostat write_thermostat')
     except HTTPError:
         _LOGGER.error("Unable to connect to Netatmo API")
         return False
 
     if config[DOMAIN][CONF_DISCOVERY]:
-        for component in 'camera', 'sensor', 'binary_sensor':
+        for component in 'camera', 'sensor', 'binary_sensor', 'climate':
             discovery.load_platform(hass, component, DOMAIN, {}, config)
 
     return True
@@ -71,10 +73,11 @@ class WelcomeData(object):
         self.auth = auth
         self.welcomedata = None
         self.camera_names = []
+        self.module_names = []
         self.home = home
 
     def get_camera_names(self):
-        """Return all module available on the API as a list."""
+        """Return all camera available on the API as a list."""
         self.camera_names = []
         self.update()
         if not self.home:
@@ -86,8 +89,24 @@ class WelcomeData(object):
                 self.camera_names.append(camera['name'])
         return self.camera_names
 
+    def get_module_names(self, camera_name):
+        """Return all module available on the API as a list."""
+        self.module_names = []
+        self.update()
+        cam_id = self.welcomedata.cameraByName(camera=camera_name,
+                                               home=self.home)['id']
+        for module in self.welcomedata.modules.values():
+            if cam_id == module['cam_id']:
+                self.module_names.append(module['name'])
+        return self.module_names
+
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
         """Call the Netatmo API to update the data."""
         import lnetatmo
-        self.welcomedata = lnetatmo.WelcomeData(self.auth)
+        self.welcomedata = lnetatmo.WelcomeData(self.auth, size=100)
+
+    @Throttle(MIN_TIME_BETWEEN_EVENT_UPDATES)
+    def update_event(self):
+        """Call the Netatmo API to update the list of events."""
+        self.welcomedata.updateEvent(home=self.home)

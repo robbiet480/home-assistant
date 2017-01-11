@@ -10,19 +10,19 @@ import random
 
 import voluptuous as vol
 
-from homeassistant.const import CONF_DEVICES, CONF_NAME
+from homeassistant.const import CONF_DEVICES, CONF_NAME, CONF_PROTOCOL
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS, ATTR_RGB_COLOR, ATTR_EFFECT, EFFECT_RANDOM,
     SUPPORT_BRIGHTNESS, SUPPORT_EFFECT, SUPPORT_RGB_COLOR, Light,
     PLATFORM_SCHEMA)
 import homeassistant.helpers.config_validation as cv
 
-REQUIREMENTS = ['https://github.com/Danielhiversen/flux_led/archive/0.7.zip'
-                '#flux_led==0.7']
+REQUIREMENTS = ['flux_led==0.12']
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_AUTOMATIC_ADD = 'automatic_add'
+ATTR_MODE = 'mode'
 
 DOMAIN = 'flux_led'
 
@@ -31,6 +31,10 @@ SUPPORT_FLUX_LED = (SUPPORT_BRIGHTNESS | SUPPORT_EFFECT |
 
 DEVICE_SCHEMA = vol.Schema({
     vol.Optional(CONF_NAME): cv.string,
+    vol.Optional(ATTR_MODE, default='rgbw'):
+        vol.All(cv.string, vol.In(['rgbw', 'rgb'])),
+    vol.Optional(CONF_PROTOCOL, default=None):
+        vol.All(cv.string, vol.In(['ledenet'])),
 })
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
@@ -48,6 +52,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         device = {}
         device['name'] = device_config[CONF_NAME]
         device['ipaddr'] = ipaddr
+        device[CONF_PROTOCOL] = device_config[CONF_PROTOCOL]
+        device[ATTR_MODE] = device_config[ATTR_MODE]
         light = FluxLight(device)
         if light.is_valid:
             lights.append(light)
@@ -65,6 +71,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         if ipaddr in light_ips:
             continue
         device['name'] = device['id'] + " " + ipaddr
+        device[ATTR_MODE] = 'rgbw'
         light = FluxLight(device)
         if light.is_valid:
             lights.append(light)
@@ -76,17 +83,20 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 class FluxLight(Light):
     """Representation of a Flux light."""
 
-    # pylint: disable=too-many-arguments
     def __init__(self, device):
         """Initialize the light."""
         import flux_led
 
         self._name = device['name']
         self._ipaddr = device['ipaddr']
+        self._protocol = device[CONF_PROTOCOL]
+        self._mode = device[ATTR_MODE]
         self.is_valid = True
         self._bulb = None
         try:
             self._bulb = flux_led.WifiLedBulb(self._ipaddr)
+            if self._protocol:
+                self._bulb.setProtocol(self._protocol)
         except socket.error:
             self.is_valid = False
             _LOGGER.error(
@@ -130,10 +140,16 @@ class FluxLight(Light):
         rgb = kwargs.get(ATTR_RGB_COLOR)
         brightness = kwargs.get(ATTR_BRIGHTNESS)
         effect = kwargs.get(ATTR_EFFECT)
-        if rgb:
+        if rgb is not None and brightness is not None:
+            self._bulb.setRgb(*tuple(rgb), brightness=brightness)
+        elif rgb is not None:
             self._bulb.setRgb(*tuple(rgb))
-        elif brightness:
-            self._bulb.setWarmWhite255(brightness)
+        elif brightness is not None:
+            if self._mode == 'rgbw':
+                self._bulb.setWarmWhite255(brightness)
+            elif self._mode == 'rgb':
+                (red, green, blue) = self._bulb.getRgb()
+                self._bulb.setRgb(red, green, blue, brightness=brightness)
         elif effect == EFFECT_RANDOM:
             self._bulb.setRgb(random.randrange(0, 255),
                               random.randrange(0, 255),

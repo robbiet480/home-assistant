@@ -9,6 +9,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
+import email.utils
 
 import voluptuous as vol
 
@@ -18,6 +19,7 @@ from homeassistant.components.notify import (
 from homeassistant.const import (
     CONF_USERNAME, CONF_PASSWORD, CONF_PORT, CONF_SENDER, CONF_RECIPIENT)
 import homeassistant.helpers.config_validation as cv
+import homeassistant.util.dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,11 +65,9 @@ def get_service(hass, config):
         return None
 
 
-# pylint: disable=too-few-public-methods, too-many-instance-attributes
 class MailNotificationService(BaseNotificationService):
     """Implement the notification service for E-Mail messages."""
 
-    # pylint: disable=too-many-arguments
     def __init__(self, server, port, sender, starttls, username,
                  password, recipient, debug):
         """Initialize the service."""
@@ -136,6 +136,8 @@ class MailNotificationService(BaseNotificationService):
         msg['To'] = self.recipient
         msg['From'] = self._sender
         msg['X-Mailer'] = 'HomeAssistant'
+        msg['Date'] = email.utils.format_datetime(dt_util.now())
+        msg['Message-Id'] = email.utils.make_msgid()
 
         return self._send_email(msg)
 

@@ -26,8 +26,8 @@ MOCKS = {
     'load*': ("homeassistant.config.load_yaml", yaml.load_yaml),
     'get': ("homeassistant.loader.get_component", loader.get_component),
     'secrets': ("homeassistant.util.yaml._secret_yaml", yaml._secret_yaml),
-    'except': ("homeassistant.bootstrap.log_exception",
-               bootstrap.log_exception)
+    'except': ("homeassistant.bootstrap.async_log_exception",
+               bootstrap.async_log_exception)
 }
 SILENCE = (
     'homeassistant.bootstrap.clear_secret_cache',
@@ -56,7 +56,6 @@ def color(the_color, *args, reset=None):
         raise ValueError("Invalid color {} in {}".format(str(k), the_color))
 
 
-# pylint: disable=too-many-locals, too-many-branches
 def run(script_args: List) -> int:
     """Handle ensure config commandline script."""
     parser = argparse.ArgumentParser(
@@ -160,12 +159,14 @@ def check(config_path):
         'secret_cache': OrderedDict(),
     }
 
-    def mock_load(filename):  # pylint: disable=unused-variable
+    # pylint: disable=unused-variable
+    def mock_load(filename):
         """Mock hass.util.load_yaml to save config files."""
         res['yaml_files'][filename] = True
         return MOCKS['load'][1](filename)
 
-    def mock_get(comp_name):  # pylint: disable=unused-variable
+    # pylint: disable=unused-variable
+    def mock_get(comp_name):
         """Mock hass.loader.get_component to replace setup & setup_platform."""
         def mock_setup(*kwargs):
             """Mock setup, only record the component name & config."""
@@ -185,12 +186,19 @@ def check(config_path):
         # Test if platform/component and overwrite setup
         if '.' in comp_name:
             module.setup_platform = mock_setup
+
+            if hasattr(module, 'async_setup_platform'):
+                del module.async_setup_platform
         else:
             module.setup = mock_setup
 
+            if hasattr(module, 'async_setup'):
+                del module.async_setup
+
         return module
 
-    def mock_secrets(ldr, node):  # pylint: disable=unused-variable
+    # pylint: disable=unused-variable
+    def mock_secrets(ldr, node):
         """Mock _get_secrets."""
         try:
             val = MOCKS['secrets'][1](ldr, node)
@@ -199,9 +207,10 @@ def check(config_path):
         res['secrets'][node.value] = val
         return val
 
-    def mock_except(ex, domain, config):  # pylint: disable=unused-variable
+    def mock_except(ex, domain, config,  # pylint: disable=unused-variable
+                    hass=None):
         """Mock bootstrap.log_exception."""
-        MOCKS['except'][1](ex, domain, config)
+        MOCKS['except'][1](ex, domain, config, hass)
         res['except'][domain] = config.get(domain, config)
 
     # Patches to skip functions
@@ -222,7 +231,8 @@ def check(config_path):
     yaml.yaml.SafeLoader.add_constructor('!secret', yaml._secret_yaml)
 
     try:
-        bootstrap.from_config_file(config_path, skip_pip=True)
+        with patch('homeassistant.util.logging.AsyncHandler._process'):
+            bootstrap.from_config_file(config_path, skip_pip=True)
         res['secret_cache'] = dict(yaml.__SECRET_CACHE)
     except Exception as err:  # pylint: disable=broad-except
         print(color('red', 'Fatal error while loading config:'), str(err))

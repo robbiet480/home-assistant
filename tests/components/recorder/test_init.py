@@ -4,9 +4,11 @@ import json
 from datetime import datetime, timedelta
 import unittest
 
+import pytest
+from homeassistant.core import callback
 from homeassistant.const import MATCH_ALL
 from homeassistant.components import recorder
-from homeassistant.bootstrap import _setup_component
+from homeassistant.bootstrap import setup_component
 from tests.common import get_test_home_assistant
 
 
@@ -17,7 +19,7 @@ class TestRecorder(unittest.TestCase):
         """Setup things to be run when tests are started."""
         self.hass = get_test_home_assistant()
         db_uri = 'sqlite://'  # In memory DB
-        _setup_component(self.hass, recorder.DOMAIN, {
+        setup_component(self.hass, recorder.DOMAIN, {
             recorder.DOMAIN: {recorder.CONF_DB_URL: db_uri}})
         self.hass.start()
         recorder._verify_instance()
@@ -110,6 +112,7 @@ class TestRecorder(unittest.TestCase):
 
         events = []
 
+        @callback
         def event_listener(event):
             """Record events from eventbus."""
             if event.event_type == event_type:
@@ -186,3 +189,91 @@ class TestRecorder(unittest.TestCase):
         # we should have all of our states still
         self.assertEqual(states.count(), 5)
         self.assertEqual(events.count(), 5)
+
+
+@pytest.fixture
+def hass_recorder():
+    """HASS fixture with in-memory recorder."""
+    hass = get_test_home_assistant()
+
+    def setup_recorder(config):
+        """Setup with params."""
+        db_uri = 'sqlite://'  # In memory DB
+        conf = {recorder.CONF_DB_URL: db_uri}
+        conf.update(config)
+        assert setup_component(hass, recorder.DOMAIN, {recorder.DOMAIN: conf})
+        hass.start()
+        hass.block_till_done()
+        recorder._verify_instance()
+        recorder._INSTANCE.block_till_done()
+        return hass
+
+    yield setup_recorder
+    hass.stop()
+
+
+def _add_entities(hass, entity_ids):
+    """Add entities."""
+    attributes = {'test_attr': 5, 'test_attr_10': 'nice'}
+    for idx, entity_id in enumerate(entity_ids):
+        hass.states.set(entity_id, 'state{}'.format(idx), attributes)
+        hass.block_till_done()
+    recorder._INSTANCE.block_till_done()
+    db_states = recorder.query('States')
+    states = recorder.execute(db_states)
+    assert db_states[0].event_id is not None
+    return states
+
+
+# pylint: disable=redefined-outer-name,invalid-name
+def test_saving_state_include_domains(hass_recorder):
+    """Test saving and restoring a state."""
+    hass = hass_recorder({'include': {'domains': 'test2'}})
+    states = _add_entities(hass, ['test.recorder', 'test2.recorder'])
+    assert len(states) == 1
+    assert hass.states.get('test2.recorder') == states[0]
+
+
+def test_saving_state_incl_entities(hass_recorder):
+    """Test saving and restoring a state."""
+    hass = hass_recorder({'include': {'entities': 'test2.recorder'}})
+    states = _add_entities(hass, ['test.recorder', 'test2.recorder'])
+    assert len(states) == 1
+    assert hass.states.get('test2.recorder') == states[0]
+
+
+def test_saving_state_exclude_domains(hass_recorder):
+    """Test saving and restoring a state."""
+    hass = hass_recorder({'exclude': {'domains': 'test'}})
+    states = _add_entities(hass, ['test.recorder', 'test2.recorder'])
+    assert len(states) == 1
+    assert hass.states.get('test2.recorder') == states[0]
+
+
+def test_saving_state_exclude_entities(hass_recorder):
+    """Test saving and restoring a state."""
+    hass = hass_recorder({'exclude': {'entities': 'test.recorder'}})
+    states = _add_entities(hass, ['test.recorder', 'test2.recorder'])
+    assert len(states) == 1
+    assert hass.states.get('test2.recorder') == states[0]
+
+
+def test_saving_state_exclude_domain_include_entity(hass_recorder):
+    """Test saving and restoring a state."""
+    hass = hass_recorder({
+        'include': {'entities': 'test.recorder'},
+        'exclude': {'domains': 'test'}})
+    states = _add_entities(hass, ['test.recorder', 'test2.recorder'])
+    assert len(states) == 2
+
+
+def test_saving_state_include_domain_exclude_entity(hass_recorder):
+    """Test saving and restoring a state."""
+    hass = hass_recorder({
+        'exclude': {'entities': 'test.recorder'},
+        'include': {'domains': 'test'}})
+    states = _add_entities(hass, ['test.recorder', 'test2.recorder',
+                                  'test.ok'])
+    assert len(states) == 1
+    assert hass.states.get('test.ok') == states[0]
+    assert hass.states.get('test.ok').state == 'state2'

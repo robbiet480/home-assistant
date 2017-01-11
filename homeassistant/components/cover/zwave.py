@@ -32,14 +32,14 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     node = zwave.NETWORK.nodes[discovery_info[zwave.const.ATTR_NODE_ID]]
     value = node.values[discovery_info[zwave.const.ATTR_VALUE_ID]]
 
-    if node.has_command_class(zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL) \
-            and value.index == 0:
+    if (value.command_class == zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL
+            and value.index == 0):
         value.set_change_verified(False)
         add_devices([ZwaveRollershutter(value)])
-    elif node.has_command_class(zwave.const.COMMAND_CLASS_SWITCH_BINARY) or \
-            node.has_command_class(zwave.const.COMMAND_CLASS_BARRIER_OPERATOR):
-        if value.type != zwave.const.TYPE_BOOL and \
-           value.genre != zwave.const.GENRE_USER:
+    elif (value.command_class == zwave.const.COMMAND_CLASS_SWITCH_BINARY or
+          value.command_class == zwave.const.COMMAND_CLASS_BARRIER_OPERATOR):
+        if (value.type != zwave.const.TYPE_BOOL and
+                value.genre != zwave.const.GENRE_USER):
             return
         value.set_change_verified(False)
         add_devices([ZwaveGarageDoor(value)])
@@ -78,9 +78,9 @@ class ZwaveRollershutter(zwave.ZWaveDeviceEntity, CoverDevice):
         """Called when a value has changed on the network."""
         if self._value.value_id == value.value_id or \
            self._value.node == value.node:
+            _LOGGER.debug('Value changed for label %s', self._value.label)
             self.update_properties()
-            self.update_ha_state()
-            _LOGGER.debug("Value changed on network %s", value)
+            self.schedule_update_ha_state()
 
     def update_properties(self):
         """Callback on data change for the registered node/value pair."""
@@ -122,7 +122,7 @@ class ZwaveRollershutter(zwave.ZWaveDeviceEntity, CoverDevice):
                zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL and value.label == \
                'Open' or value.command_class == \
                zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL and value.label == \
-               'Down':
+               'Up':
                 self._lozwmgr.pressButton(value.value_id)
                 break
 
@@ -132,7 +132,7 @@ class ZwaveRollershutter(zwave.ZWaveDeviceEntity, CoverDevice):
                 class_id=zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL).values():
             if value.command_class == \
                zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL and value.label == \
-               'Up' or value.command_class == \
+               'Down' or value.command_class == \
                zwave.const.COMMAND_CLASS_SWITCH_MULTILEVEL and value.label == \
                'Close':
                 self._lozwmgr.pressButton(value.value_id)
@@ -170,9 +170,9 @@ class ZwaveGarageDoor(zwave.ZWaveDeviceEntity, CoverDevice):
     def value_changed(self, value):
         """Called when a value has changed on the network."""
         if self._value.value_id == value.value_id:
+            _LOGGER.debug('Value changed for label %s', self._value.label)
             self._state = value.data
-            self.update_ha_state()
-            _LOGGER.debug("Value changed on network %s", value)
+            self.schedule_update_ha_state()
 
     @property
     def is_closed(self):

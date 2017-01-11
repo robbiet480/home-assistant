@@ -16,7 +16,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.const import (CONF_HOST, CONF_PORT)
 import homeassistant.helpers.config_validation as cv
 
-REQUIREMENTS = ['pynx584==0.2']
+REQUIREMENTS = ['pynx584==0.4']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class NX584Watcher(threading.Thread):
         if not zone_sensor:
             return
         zone_sensor._zone['state'] = event['zone_state']
-        zone_sensor.update_ha_state()
+        zone_sensor.schedule_update_ha_state()
 
     def _process_events(self, events):
         for event in events:
