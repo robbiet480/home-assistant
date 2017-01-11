@@ -6,11 +6,17 @@ Uses pylutron (http://github.com/thecynic/pylutron).
 
 import logging
 
+import voluptuous as vol
+
+import homeassistant.helpers.config_validation as cv
 from homeassistant.components import group
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity import Entity
+from homeassistant.const import (CONF_HOST, CONF_USERNAME,
+                                 CONF_PASSWORD)
 
-REQUIREMENTS = ['https://github.com/thecynic/pylutron/archive/v0.1.0.zip#pylutron==0.1.0']
+REQUIREMENTS = ["https://github.com/thecynic/pylutron/"
+                "archive/v0.1.0.zip#pylutron==0.1.0"]
 
 DOMAIN = "lutron"
 
@@ -24,6 +30,14 @@ LUTRON_CONTROLLER = None
 LUTRON_DEVICES = {'light': []}
 LUTRON_GROUPS = {}
 
+CONFIG_SCHEMA = vol.Schema({
+    DOMAIN: vol.Schema({
+        vol.Required(CONF_HOST): cv.string,
+        vol.Required(CONF_USERNAME): cv.string,
+        vol.Required(CONF_PASSWORD): cv.string,
+    })
+})
+
 
 def setup(hass, base_config):
     """Setup our skeleton component."""
@@ -33,19 +47,18 @@ def setup(hass, base_config):
 
     config = base_config.get(DOMAIN)
     LUTRON_CONTROLLER = Lutron(
-        config['lutron_host'],
-        config['lutron_user'],
-        config['lutron_password']
+        config[DOMAIN].get(CONF_HOST),
+        config[DOMAIN].get(CONF_USERNAME),
+        config[DOMAIN].get(CONF_PASSWORD)
     )
     LUTRON_CONTROLLER.load_xml_db()
     LUTRON_CONTROLLER.connect()
-    _LOGGER.info("CONNECTED?!")
+    _LOGGER.info("Connected to Lutron")
 
     # Sort our devices into types
     for area in LUTRON_CONTROLLER.areas:
         if area.name not in LUTRON_GROUPS:
-            gr = group.Group(hass, area.name, [])
-            LUTRON_GROUPS[area.name] = gr
+            LUTRON_GROUPS[area.name] = group.Group(hass, area.name, [])
         for output in area.outputs:
             LUTRON_DEVICES['light'].append((area.name, output))
 

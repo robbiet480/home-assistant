@@ -24,9 +24,11 @@ def setup_platform(hass, config, add_devices_callback, discovery_info=None):
     for area in area_devs:
         if area not in LUTRON_GROUPS:
             continue
-        gr = LUTRON_GROUPS[area]
-        gr.update_tracked_entity_ids(
-            list(gr.tracking) + [dev.entity_id for dev in area_devs[area]])
+        found_group = LUTRON_GROUPS[area]
+        tracking = list(found_group.tracking)
+        area_dev_entities = [dev.entity_id for dev in area_devs[area]]
+        found_group.update_tracked_entity_ids(tracking +
+                                              area_dev_entities)
 
 
 def to_lutron_level(level):
@@ -50,7 +52,8 @@ class LutronLight(LutronDevice, Light):
     @property
     def brightness(self):
         """Return the brightness of the light."""
-        new_brightness = to_hass_level(self._lutron_device.last_level())
+        last_level = self._lutron_device.last_level()
+        new_brightness = to_hass_level(last_level)
         if new_brightness != 0:
             self._prev_brightness = new_brightness
         return new_brightness

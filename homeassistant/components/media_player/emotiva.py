@@ -11,7 +11,8 @@ from homeassistant.components.media_player import (
     SUPPORT_VOLUME_STEP, SUPPORT_SELECT_SOURCE, MediaPlayerDevice)
 from homeassistant.const import STATE_OFF, STATE_ON
 
-REQUIREMENTS = ['https://github.com/thecynic/pymotiva/archive/v0.1.0.zip#pymotiva==0.1.0']
+REQUIREMENTS = ["https://github.com/thecynic/pymotiva/archive/"
+                "v0.1.0.zip#pymotiva==0.1.0"]
 
 _LOGGER = logging.getLogger(__name__)
 
