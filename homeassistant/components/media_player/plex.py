@@ -7,6 +7,7 @@ https://home-assistant.io/components/media_player.plex/
 import json
 import logging
 import os
+import requests
 from datetime import timedelta
 from urllib.parse import urlparse
 
@@ -65,8 +66,9 @@ def setup_platform(hass, config, add_devices_callback, discovery_info=None):
     config = config_from_file(hass.config.path(PLEX_CONFIG_FILE))
     if len(config):
         # Setup a configured PlexServer
-        host, token = config.popitem()
-        token = token['token']
+        host, config_dict = config.popitem()
+        token = config_dict['token']
+        protocol = config_dict.get('protocol', 'http')
     # Via discovery
     elif discovery_info is not None:
         # Parse discovery data
@@ -76,26 +78,49 @@ def setup_platform(hass, config, add_devices_callback, discovery_info=None):
         if host in _CONFIGURING:
             return
         token = None
+        protocol = 'http'
     else:
         return
 
-    setup_plexserver(host, token, hass, add_devices_callback)
+    setup_plexserver(host, token, hass, add_devices_callback, protocol)
 
 
-def setup_plexserver(host, token, hass, add_devices_callback):
+def setup_plexserver(host, token, hass, add_devices_callback, protocol='http'):
     """Setup a plexserver based on host parameter."""
     import plexapi.server
     import plexapi.exceptions
 
-    try:
-        plexserver = plexapi.server.PlexServer('http://%s' % host, token)
-    except (plexapi.exceptions.BadRequest,
-            plexapi.exceptions.Unauthorized,
-            plexapi.exceptions.NotFound) as error:
-        _LOGGER.info(error)
-        # No token or wrong token
-        request_configuration(host, hass, add_devices_callback)
-        return
+    # Need to determine proper protocol
+    if host in _CONFIGURING:
+        try:
+            connection_url = 'https://{}'.format(host)
+            plexserver = plexapi.server.PlexServer(connection_url, token)
+        except (plexapi.exceptions.BadRequest,
+                plexapi.exceptions.Unauthorized,
+                plexapi.exceptions.NotFound,
+                requests.exceptions.SSLError):
+            pass
+        try:
+            connection_url = 'http://{}'.format(host)
+            plexserver = plexapi.server.PlexServer(connection_url, token)
+        except (plexapi.exceptions.BadRequest,
+                plexapi.exceptions.Unauthorized,
+                plexapi.exceptions.NotFound) as error:
+            _LOGGER.info(error)
+            # No token or wrong token
+            request_configuration(host, hass, add_devices_callback)
+            return
+    else:
+        try:
+            connection_url = '{}://{}'.format(protocol, host)
+            plexserver = plexapi.server.PlexServer(connection_url, token)
+        except (plexapi.exceptions.BadRequest,
+                plexapi.exceptions.Unauthorized,
+                plexapi.exceptions.NotFound) as error:
+            _LOGGER.info(error)
+            # No token or wrong token
+            request_configuration(host, hass, add_devices_callback)
+            return
 
     # If we came here and configuring this host, mark as done
     if host in _CONFIGURING:
@@ -107,7 +132,7 @@ def setup_plexserver(host, token, hass, add_devices_callback):
     # Save config
     if not config_from_file(
             hass.config.path(PLEX_CONFIG_FILE),
-            {host: {'token': token}}):
+            {host: {'token': token, 'protocol': protocol}}):
         _LOGGER.error('failed to save config file')
 
     _LOGGER.info('Connected to: http://%s', host)
