@@ -304,6 +304,7 @@ def setup(hass, config):
 
     def value_added(node, value):
         """Called when a value is added to a node on the network."""
+        #print('value!', value, value.label)
         for (component,
              generic_device_class,
              specific_device_class,
@@ -376,6 +377,7 @@ def setup(hass, config):
 
     def scene_activated(node, scene_id):
         """Called when a scene is activated on any node in the network."""
+        print('node scene activate!!!')
         hass.bus.fire(const.EVENT_SCENE_ACTIVATED, {
             ATTR_ENTITY_ID: _node_object_id(node),
             const.ATTR_OBJECT_ID: _node_object_id(node),
@@ -402,8 +404,15 @@ def setup(hass, config):
                      " have been queried")
         hass.bus.fire(const.EVENT_NETWORK_COMPLETE)
 
+    def value_changed(node, value):
+        """Called when a value is added to a node on the network."""
+        if value.command_class == 91:
+            print('VALUE CHANGED', node.node_id, value)
+
     dispatcher.connect(
         value_added, ZWaveNetwork.SIGNAL_VALUE_ADDED, weak=False)
+    dispatcher.connect(
+        value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED, weak=False)
     dispatcher.connect(
         scene_activated, ZWaveNetwork.SIGNAL_SCENE_EVENT, weak=False)
     dispatcher.connect(
@@ -498,6 +507,7 @@ def setup(hass, config):
         """Print a config parameter from a node."""
         node_id = service.data.get(const.ATTR_NODE_ID)
         node = NETWORK.nodes[node_id]
+        nice_print_node(node)
         param = service.data.get(const.ATTR_CONFIG_PARAMETER)
         _LOGGER.info("Config parameter %s on Node %s : %s",
                      param, node_id, get_config_value(node, param))
@@ -624,9 +634,9 @@ class ZWaveDeviceEntity(Entity):
 
     def network_value_changed(self, value):
         """Called when a value has changed on the network."""
+        #_LOGGER.info('Value changed for label %s on node %s', self._value.label, self._value.node)
         if self._value.value_id == value.value_id or \
            self._value.node == value.node:
-            _LOGGER.debug('Value changed for label %s', self._value.label)
             self.value_changed(value)
 
     def value_changed(self, value):
