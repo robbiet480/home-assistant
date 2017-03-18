@@ -1,7 +1,7 @@
 # coding: utf-8
 """Constants used by Home Assistant components."""
 MAJOR_VERSION = 0
-MINOR_VERSION = 40
+MINOR_VERSION = 41
 PATCH_VERSION = '0.dev0'
 __short_version__ = '{}.{}'.format(MAJOR_VERSION, MINOR_VERSION)
 __version__ = '{}.{}'.format(__short_version__, PATCH_VERSION)
@@ -127,6 +127,7 @@ CONF_PLATFORM = 'platform'
 CONF_PORT = 'port'
 CONF_PREFIX = 'prefix'
 CONF_PROTOCOL = 'protocol'
+CONF_PROXY_SSL = 'proxy_ssl'
 CONF_QUOTE = 'quote'
 CONF_RECIPIENT = 'recipient'
 CONF_RESOURCE = 'resource'

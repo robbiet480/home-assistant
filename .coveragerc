@@ -14,9 +14,12 @@ omit =
     homeassistant/components/arduino.py
     homeassistant/components/*/arduino.py
 
+    homeassistant/components/android_ip_webcam.py
+    homeassistant/components/*/android_ip_webcam.py
+
     homeassistant/components/bbb_gpio.py
     homeassistant/components/*/bbb_gpio.py
-    
+
     homeassistant/components/blink.py
     homeassistant/components/*/blink.py
 
@@ -113,7 +116,6 @@ omit =
     homeassistant/components/*/zigbee.py
 
     homeassistant/components/zwave/*
-    homeassistant/components/*/zwave.py
 
     homeassistant/components/enocean.py
     homeassistant/components/*/enocean.py
@@ -168,12 +170,15 @@ omit =
     homeassistant/components/climate/oem.py
     homeassistant/components/climate/proliphix.py
     homeassistant/components/climate/radiotherm.py
+    homeassistant/components/climate/zwave.py
+    homeassistant/components/config/zwave.py
     homeassistant/components/cover/garadget.py
     homeassistant/components/cover/homematic.py
     homeassistant/components/cover/myq.py
     homeassistant/components/cover/rpi_gpio.py
     homeassistant/components/cover/scsgate.py
     homeassistant/components/cover/wink.py
+    homeassistant/components/cover/zwave.py
     homeassistant/components/device_tracker/actiontec.py
     homeassistant/components/device_tracker/aruba.py
     homeassistant/components/device_tracker/asuswrt.py
@@ -226,8 +231,10 @@ omit =
     homeassistant/components/light/yeelightsunflower.py
     homeassistant/components/light/piglow.py
     homeassistant/components/light/zengge.py
+    homeassistant/components/light/zwave.py
     homeassistant/components/lirc.py
     homeassistant/components/lock/nuki.py
+    homeassistant/components/lock/zwave.py
     homeassistant/components/media_player/anthemav.py
     homeassistant/components/media_player/apple_tv.py
     homeassistant/components/media_player/aquostv.py
@@ -350,7 +357,6 @@ omit =
     homeassistant/components/sensor/linux_battery.py
     homeassistant/components/sensor/loopenergy.py
     homeassistant/components/sensor/miflora.py
-    homeassistant/components/sensor/mint_finance.py
     homeassistant/components/sensor/modem_callerid.py
     homeassistant/components/sensor/mqtt_room.py
     homeassistant/components/sensor/netdata.py
@@ -396,6 +402,7 @@ omit =
     homeassistant/components/sensor/xbox_live.py
     homeassistant/components/sensor/yweather.py
     homeassistant/components/sensor/zamg.py
+    homeassistant/components/sensor/zwave.py
     homeassistant/components/switch/acer_projector.py
     homeassistant/components/switch/anel_pwrctrl.py
     homeassistant/components/switch/arest.py
@@ -418,6 +425,7 @@ omit =
     homeassistant/components/switch/tplink.py
     homeassistant/components/switch/transmission.py
     homeassistant/components/switch/wake_on_lan.py
+    homeassistant/components/switch/zwave.py
     homeassistant/components/telegram_webhooks.py
     homeassistant/components/thingspeak.py
     homeassistant/components/tts/amazon_polly.py
