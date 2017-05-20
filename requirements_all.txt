@@ -79,6 +79,7 @@ apns2==0.1.1
 asterisk_mbox==0.4.0
 
 # homeassistant.components.dyndns
+# homeassistant.components.letsencrypt
 asyncme==0.4.1
 
 # homeassistant.components.light.avion
