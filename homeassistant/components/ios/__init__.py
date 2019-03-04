@@ -6,6 +6,11 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.mobile_app import async_devices_with_key
+from homeassistant.components.mobile_app.const import (ATTR_APP_DATA as
+                                                       MA_APP_DATA,
+                                                       ATTR_DEVICE_NAME as
+                                                       MA_DEVICE_NAME)
 from homeassistant.const import HTTP_BAD_REQUEST, HTTP_INTERNAL_SERVER_ERROR
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -160,6 +165,13 @@ CONFIGURATION_FILE = '.ios.conf'
 def devices_with_push(hass):
     """Return a dictionary of push enabled targets."""
     targets = {}
+
+    for device in async_devices_with_key(hass, DOMAIN, ATTR_PUSH_ID):
+        targets[device[MA_DEVICE_NAME]] = device[MA_APP_DATA][ATTR_PUSH_ID]
+
+    if targets:
+        return targets
+
     for device_name, device in hass.data[DOMAIN][ATTR_DEVICES].items():
         if device.get(ATTR_PUSH_ID) is not None:
             targets[device_name] = device.get(ATTR_PUSH_ID)
@@ -169,6 +181,13 @@ def devices_with_push(hass):
 def enabled_push_ids(hass):
     """Return a list of push enabled target push IDs."""
     push_ids = list()
+
+    for device in async_devices_with_key(hass, DOMAIN, ATTR_PUSH_ID):
+        push_ids.append(device[MA_APP_DATA][ATTR_PUSH_ID])
+
+    if push_ids:
+        return push_ids
+
     for device in hass.data[DOMAIN][ATTR_DEVICES].values():
         if device.get(ATTR_PUSH_ID) is not None:
             push_ids.append(device.get(ATTR_PUSH_ID))
@@ -177,11 +196,17 @@ def enabled_push_ids(hass):
 
 def devices(hass):
     """Return a dictionary of all identified devices."""
+    # Not migrated to mobile_app since only sensor.ios uses it and that
+    # platform will be going away soon.
     return hass.data[DOMAIN][ATTR_DEVICES]
 
 
 def device_name_for_push_id(hass, push_id):
     """Return the device name for the push ID."""
+    for device in async_devices_with_key(hass, DOMAIN, ATTR_PUSH_ID):
+        if device[MA_APP_DATA][ATTR_PUSH_ID] == push_id:
+            return device[MA_DEVICE_NAME]
+
     for device_name, device in hass.data[DOMAIN][ATTR_DEVICES].items():
         if device.get(ATTR_PUSH_ID) is push_id:
             return device_name
