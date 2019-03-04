@@ -1,10 +1,11 @@
 """Integrates Native Apps to Home Assistant."""
+from homeassistant.helpers.discovery import async_load_platform
 from homeassistant.helpers.typing import ConfigType, HomeAssistantType
 from homeassistant.loader import bind_hass
 
-from .const import (ATTR_APP_COMPONENT, ATTR_APP_DATA, ATTR_DELETED_IDS,
-                    ATTR_REGISTRATIONS, ATTR_STORE, DOMAIN, STORAGE_KEY,
-                    STORAGE_VERSION)
+from .const import (ATTR_APP_COMPONENT, ATTR_APP_DATA, ATTR_BINARY_SENSOR,
+                    ATTR_DELETED_IDS, ATTR_REGISTRATIONS, ATTR_SENSOR,
+                    ATTR_STORE, DOMAIN, STORAGE_KEY, STORAGE_VERSION)
 
 from .http_api import register_http_handlers
 from .webhook import setup_device
@@ -20,17 +21,27 @@ async def async_setup(hass: HomeAssistantType, config: ConfigType):
     store = hass.helpers.storage.Store(STORAGE_VERSION, STORAGE_KEY)
     app_config = await store.async_load()
     if app_config is None:
-        app_config = {ATTR_DELETED_IDS: [], ATTR_REGISTRATIONS: {}}
+        app_config = {
+            ATTR_BINARY_SENSOR: {},
+            ATTR_DELETED_IDS: [],
+            ATTR_REGISTRATIONS: {},
+            ATTR_SENSOR: {},
+        }
 
-    if hass.data.get(DOMAIN) is None:
-        hass.data[DOMAIN] = {ATTR_DELETED_IDS: [], ATTR_REGISTRATIONS: {}}
+    hass.data[DOMAIN] = app_config
 
-    hass.data[DOMAIN][ATTR_DELETED_IDS] = app_config[ATTR_DELETED_IDS]
-    hass.data[DOMAIN][ATTR_REGISTRATIONS] = app_config[ATTR_REGISTRATIONS]
     hass.data[DOMAIN][ATTR_STORE] = store
 
     for device in app_config[ATTR_REGISTRATIONS].values():
         setup_device(hass, store, device)
+
+    if app_config[ATTR_SENSOR]:
+        hass.async_create_task(async_load_platform(hass, ATTR_SENSOR, DOMAIN,
+                                                   None, config))
+
+    if app_config[ATTR_BINARY_SENSOR]:
+        hass.async_create_task(async_load_platform(hass, ATTR_BINARY_SENSOR,
+                                                   DOMAIN, None, config))
 
     register_http_handlers(hass, store)
     register_websocket_handlers(hass)

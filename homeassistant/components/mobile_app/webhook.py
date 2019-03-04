@@ -19,24 +19,27 @@ from homeassistant.const import (ATTR_DOMAIN, ATTR_SERVICE, ATTR_SERVICE_DATA,
 from homeassistant.core import EventOrigin
 from homeassistant.exceptions import (HomeAssistantError, ServiceNotFound,
                                       TemplateError)
-from homeassistant.helpers import template
-from homeassistant.helpers.discovery import load_platform
+from homeassistant.helpers.discovery import async_load_platform, load_platform
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.template import Template
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.loader import get_platform
 
 from .const import (ATTR_APP_COMPONENT, ATTR_DELETED_IDS,
                     ATTR_DEVICE_NAME, ATTR_EVENT_DATA, ATTR_EVENT_TYPE,
-                    ATTR_REGISTRATIONS, ATTR_TEMPLATE, ATTR_TEMPLATE_VARIABLES,
-                    ATTR_WEBHOOK_DATA, ATTR_WEBHOOK_ENCRYPTED,
-                    ATTR_WEBHOOK_ENCRYPTED_DATA, ATTR_WEBHOOK_TYPE,
-                    CONF_CLOUDHOOK_ID, CONF_CLOUDHOOK_URL, CONF_SECRET,
-                    DOMAIN, HTTP_X_CLOUD_HOOK_ID, HTTP_X_CLOUD_HOOK_URL,
-                    WEBHOOK_PAYLOAD_SCHEMA, WEBHOOK_SCHEMAS,
-                    WEBHOOK_TYPES, WEBHOOK_TYPE_CALL_SERVICE,
-                    WEBHOOK_TYPE_FIRE_EVENT, WEBHOOK_TYPE_RENDER_TEMPLATE,
-                    WEBHOOK_TYPE_UPDATE_LOCATION,
-                    WEBHOOK_TYPE_UPDATE_REGISTRATION)
+                    ATTR_REGISTRATIONS, ATTR_SENSOR_TYPE,
+                    ATTR_SENSOR_UNIQUE_ID, ATTR_TEMPLATE,
+                    ATTR_TEMPLATE_VARIABLES, ATTR_WEBHOOK_DATA,
+                    ATTR_WEBHOOK_ENCRYPTED, ATTR_WEBHOOK_ENCRYPTED_DATA,
+                    ATTR_WEBHOOK_TYPE, CONF_CLOUDHOOK_ID, CONF_CLOUDHOOK_URL,
+                    CONF_SECRET, DOMAIN, HTTP_X_CLOUD_HOOK_ID,
+                    HTTP_X_CLOUD_HOOK_URL, SIGNAL_SENSOR_UPDATE,
+                    WEBHOOK_PAYLOAD_SCHEMA, WEBHOOK_SCHEMAS, WEBHOOK_TYPES,
+                    WEBHOOK_TYPE_CALL_SERVICE, WEBHOOK_TYPE_FIRE_EVENT,
+                    WEBHOOK_TYPE_RENDER_TEMPLATE, WEBHOOK_TYPE_UPDATE_LOCATION,
+                    WEBHOOK_TYPE_UPDATE_REGISTRATION,
+                    WEBHOOK_TYPE_UPDATE_SENSOR)
 
 from .helpers import (device_context, _decrypt_payload, empty_okay_response,
                       safe_device, savable_state)
@@ -154,7 +157,7 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
 
     if webhook_type == WEBHOOK_TYPE_RENDER_TEMPLATE:
         try:
-            tpl = template.Template(data[ATTR_TEMPLATE], hass)
+            tpl = Template(data[ATTR_TEMPLATE], hass)
             rendered = tpl.async_render(data.get(ATTR_TEMPLATE_VARIABLES))
             return json_response({"rendered": rendered}, headers=headers)
         # noqa: E722 pylint: disable=broad-except
@@ -190,3 +193,30 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
             return empty_okay_response()
 
         return json_response(safe_device(new_device))
+
+    if webhook_type == WEBHOOK_TYPE_UPDATE_SENSOR:
+        entity_type = data[ATTR_SENSOR_TYPE]
+
+        unique_id = "{}_{}".format(webhook_id, data[ATTR_SENSOR_UNIQUE_ID])
+        data[ATTR_SENSOR_UNIQUE_ID] = unique_id
+
+        data[CONF_WEBHOOK_ID] = webhook_id
+
+        new_entity = (unique_id not in hass.data[DOMAIN][entity_type])
+
+        hass.data[DOMAIN][entity_type][unique_id] = data
+
+        try:
+            await store.async_save(savable_state(hass))
+        except HomeAssistantError as ex:
+            _LOGGER.error("Error updating mobile_app registration: %s", ex)
+            return empty_okay_response()
+
+        if new_entity:
+            hass.async_create_task(async_load_platform(
+                hass, data[ATTR_SENSOR_TYPE], DOMAIN, data,
+                {DOMAIN: {}}))
+        else:
+            async_dispatcher_send(hass, SIGNAL_SENSOR_UPDATE, data)
+
+        return json_response({"status": "updated"})

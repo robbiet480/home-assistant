@@ -9,9 +9,10 @@ from homeassistant.core import Context
 from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (ATTR_APP_DATA, ATTR_APP_ID, ATTR_APP_NAME,
-                    ATTR_APP_VERSION, ATTR_DELETED_IDS, ATTR_DEVICE_NAME,
-                    ATTR_MANUFACTURER, ATTR_MODEL, ATTR_OS_VERSION,
-                    ATTR_REGISTRATIONS, ATTR_SUPPORTS_ENCRYPTION,
+                    ATTR_APP_VERSION, ATTR_BINARY_SENSOR, ATTR_DELETED_IDS,
+                    ATTR_DEVICE_NAME, ATTR_MANUFACTURER, ATTR_MODEL,
+                    ATTR_OS_VERSION, ATTR_REGISTRATIONS,
+                    ATTR_SENSOR, ATTR_SUPPORTS_ENCRYPTION,
                     CONF_USER_ID, DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,6 +99,8 @@ def safe_device(device: Dict) -> Dict:
 def savable_state(hass: HomeAssistantType) -> Dict:
     """Return a clean object containing things that should be saved."""
     return {
+        ATTR_BINARY_SENSOR: hass.data[DOMAIN][ATTR_BINARY_SENSOR],
         ATTR_DELETED_IDS: hass.data[DOMAIN][ATTR_DELETED_IDS],
-        ATTR_REGISTRATIONS: hass.data[DOMAIN][ATTR_REGISTRATIONS]
+        ATTR_REGISTRATIONS: hass.data[DOMAIN][ATTR_REGISTRATIONS],
+        ATTR_SENSOR: hass.data[DOMAIN][ATTR_SENSOR],
     }
