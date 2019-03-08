@@ -16,7 +16,7 @@ from tests.common import async_mock_service
 
 from . import authed_api_client, webhook_client  # noqa: F401
 
-from .const import (CALL_SERVICE, FIRE_EVENT, REGISTER, REGISTER_CLEARTEXT,
+from .const import (CALL_SERVICE, FIRE_EVENT, REGISTER_CLEARTEXT,
                     RENDER_TEMPLATE, UPDATE)
 
 
@@ -157,6 +157,19 @@ async def test_webhook_handle_decryption(webhook_client):  # noqa: F811
     assert json.loads(decrypted_data) == {'rendered': 'Hello world'}
 
 
+async def test_webhook_requires_encryption(webhook_client):  # noqa: F811
+    """Test that encrypted registrations only accept encrypted data."""
+    resp = await webhook_client.post(
+        '/api/webhook/mobile_app_test',
+        json=RENDER_TEMPLATE
+    )
+
+    assert resp.status == 200
+
+    webhook_json = await resp.json()
+    assert webhook_json == {}
+
+
 async def mock_create_cloudhook(hass, webhook_id):
     """Return a mock cloudhook create payload."""
     return {
@@ -177,7 +190,7 @@ def mock_cloud_logged_in(hass):
 async def test_cloud_forwarding(hass, hass_client, authed_api_client):  # noqa: E501 F811
     """Test that a local webhook provides a cloud URL in responses."""
     resp = await authed_api_client.post(
-        '/api/mobile_app/devices', json=REGISTER
+        '/api/mobile_app/devices', json=REGISTER_CLEARTEXT
     )
 
     assert resp.status == 201

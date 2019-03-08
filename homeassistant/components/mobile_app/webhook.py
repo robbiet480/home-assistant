@@ -25,18 +25,17 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.loader import get_platform
 
-from .const import (ATTR_APP_COMPONENT, DATA_DELETED_IDS,
-                    ATTR_DEVICE_NAME, ATTR_EVENT_DATA, ATTR_EVENT_TYPE,
-                    DATA_REGISTRATIONS, ATTR_TEMPLATE, ATTR_TEMPLATE_VARIABLES,
-                    ATTR_WEBHOOK_DATA, ATTR_WEBHOOK_ENCRYPTED,
-                    ATTR_WEBHOOK_ENCRYPTED_DATA, ATTR_WEBHOOK_TYPE,
-                    CONF_CLOUDHOOK_ID, CONF_CLOUDHOOK_URL, CONF_SECRET,
-                    DOMAIN, HTTP_X_CLOUD_HOOK_ID, HTTP_X_CLOUD_HOOK_URL,
+from .const import (ATTR_APP_COMPONENT, ATTR_DEVICE_NAME, ATTR_EVENT_DATA,
+                    ATTR_EVENT_TYPE, ATTR_SUPPORTS_ENCRYPTION, ATTR_TEMPLATE,
+                    ATTR_TEMPLATE_VARIABLES, ATTR_WEBHOOK_DATA,
+                    ATTR_WEBHOOK_ENCRYPTED, ATTR_WEBHOOK_ENCRYPTED_DATA,
+                    ATTR_WEBHOOK_TYPE, CONF_CLOUDHOOK_ID, CONF_CLOUDHOOK_URL,
+                    CONF_SECRET, DATA_DELETED_IDS, DATA_REGISTRATIONS, DOMAIN,
+                    HTTP_X_CLOUD_HOOK_ID, HTTP_X_CLOUD_HOOK_URL,
                     WEBHOOK_PAYLOAD_SCHEMA, WEBHOOK_SCHEMAS,
-                    WEBHOOK_TYPES, WEBHOOK_TYPE_CALL_SERVICE,
-                    WEBHOOK_TYPE_FIRE_EVENT, WEBHOOK_TYPE_RENDER_TEMPLATE,
-                    WEBHOOK_TYPE_UPDATE_LOCATION,
-                    WEBHOOK_TYPE_UPDATE_REGISTRATION)
+                    WEBHOOK_TYPE_CALL_SERVICE, WEBHOOK_TYPE_FIRE_EVENT,
+                    WEBHOOK_TYPE_RENDER_TEMPLATE, WEBHOOK_TYPE_UPDATE_LOCATION,
+                    WEBHOOK_TYPE_UPDATE_REGISTRATION, WEBHOOK_TYPES)
 
 from .helpers import (device_context, _decrypt_payload, empty_okay_response,
                       safe_device, savable_state, webhook_response)
@@ -70,6 +69,12 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
     except ValueError:
         _LOGGER.warning('Received invalid JSON from mobile_app')
         return json_response([], status=HTTP_BAD_REQUEST)
+
+    if (req_data.get(ATTR_WEBHOOK_ENCRYPTED, False) is False and
+            device[ATTR_SUPPORTS_ENCRYPTION]):
+        _LOGGER.warning("Refusing to accept unencrypted webhook from %s",
+                        device[ATTR_DEVICE_NAME])
+        return empty_okay_response()
 
     try:
         req_data = WEBHOOK_PAYLOAD_SCHEMA(req_data)
