@@ -28,6 +28,7 @@ REGISTER = {
     'device_name': 'Test 1',
     'manufacturer': 'mobile_app',
     'model': 'Test',
+    'os_name': 'Tests',
     'os_version': '1.0',
     'supports_encryption': True
 }
