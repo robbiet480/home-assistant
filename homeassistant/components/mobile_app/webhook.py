@@ -36,10 +36,11 @@ from .const import (ATTR_APP_COMPONENT, ATTR_DEVICE_NAME, ATTR_EVENT_DATA,
                     HTTP_X_CLOUD_HOOK_ID, HTTP_X_CLOUD_HOOK_URL,
                     SIGNAL_SENSOR_UPDATE, WEBHOOK_PAYLOAD_SCHEMA,
                     WEBHOOK_SCHEMAS, WEBHOOK_TYPE_CALL_SERVICE,
-                    WEBHOOK_TYPE_FIRE_EVENT, WEBHOOK_TYPE_RENDER_TEMPLATE,
+                    WEBHOOK_TYPE_FIRE_EVENT, WEBHOOK_TYPE_REGISTER_SENSOR,
+                    WEBHOOK_TYPE_RENDER_TEMPLATE,
                     WEBHOOK_TYPE_UPDATE_LOCATION,
                     WEBHOOK_TYPE_UPDATE_REGISTRATION,
-                    WEBHOOK_TYPE_UPDATE_SENSOR, WEBHOOK_TYPES)
+                    WEBHOOK_TYPE_UPDATE_SENSOR_STATES, WEBHOOK_TYPES)
 
 from .helpers import (device_context, _decrypt_payload, empty_okay_response,
                       safe_device, savable_state, webhook_response)
@@ -50,6 +51,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup_device(hass: HomeAssistantType, store: Store, device: Dict) -> None:
     """Register the webhook for a device and loads the app component."""
+    # This is here instead of helpers.py to avoid a dependency cycle.
     device_name = 'Mobile App: {}'.format(device[ATTR_DEVICE_NAME])
     webhook_id = device[CONF_WEBHOOK_ID]
     webhook_register(hass, DOMAIN, device_name, webhook_id,
@@ -203,17 +205,21 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
 
         return webhook_response(safe_device(new_device), device=new_device)
 
-    if webhook_type == WEBHOOK_TYPE_UPDATE_SENSOR:
+    if webhook_type == WEBHOOK_TYPE_REGISTER_SENSOR:
         entity_type = data[ATTR_SENSOR_TYPE]
 
-        unique_id = "{}_{}".format(webhook_id, data[ATTR_SENSOR_UNIQUE_ID])
-        data[ATTR_SENSOR_UNIQUE_ID] = unique_id
+        unique_id = data[ATTR_SENSOR_UNIQUE_ID]
+
+        unique_store_key = "{}_{}".format(webhook_id, unique_id)
+
+        if unique_store_key in hass.data[DOMAIN][entity_type]:
+            _LOGGER.error("Refusing to re-register existing sensor %s!",
+                          unique_id)
+            return empty_okay_response()
 
         data[CONF_WEBHOOK_ID] = webhook_id
 
-        new_entity = (unique_id not in hass.data[DOMAIN][entity_type])
-
-        hass.data[DOMAIN][entity_type][unique_id] = data
+        hass.data[DOMAIN][entity_type][unique_store_key] = data
 
         try:
             await store.async_save(savable_state(hass))
@@ -221,11 +227,44 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
             _LOGGER.error("Error updating mobile_app registration: %s", ex)
             return empty_okay_response()
 
-        if new_entity:
-            hass.async_create_task(async_load_platform(
-                hass, data[ATTR_SENSOR_TYPE], DOMAIN, data,
-                {DOMAIN: {}}))
-        else:
-            async_dispatcher_send(hass, SIGNAL_SENSOR_UPDATE, data)
+        hass.async_create_task(async_load_platform(hass,
+                                                   data[ATTR_SENSOR_TYPE],
+                                                   DOMAIN, data, {DOMAIN: {}}))
 
-        return json_response({"status": "updated"})
+        return json_response({"status": "registered"})
+
+    if webhook_type == WEBHOOK_TYPE_UPDATE_SENSOR_STATES:
+        resp = {}
+        for sensor in data:
+            entity_type = sensor[ATTR_SENSOR_TYPE]
+
+            unique_id = sensor[ATTR_SENSOR_UNIQUE_ID]
+
+            unique_store_key = "{}_{}".format(webhook_id, unique_id)
+
+            if unique_store_key not in hass.data[DOMAIN][entity_type]:
+                _LOGGER.error("Refusing to update non-registered sensor: %s",
+                              unique_store_key)
+                resp[unique_id] = {
+                    "status": "error",
+                    "message": "not_registered"
+                }
+                continue
+
+            entry = hass.data[DOMAIN][entity_type][unique_store_key]
+
+            new_state = {**entry, **sensor}
+
+            hass.data[DOMAIN][entity_type][unique_store_key] = new_state
+
+            try:
+                await store.async_save(savable_state(hass))
+            except HomeAssistantError as ex:
+                _LOGGER.error("Error updating mobile_app registration: %s", ex)
+                return empty_okay_response()
+
+            async_dispatcher_send(hass, SIGNAL_SENSOR_UPDATE, new_state)
+
+            resp[unique_id] = {"status": "okay"}
+
+        return json_response(resp)

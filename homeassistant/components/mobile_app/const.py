@@ -58,14 +58,17 @@ HTTP_X_CLOUD_HOOK_URL = 'X-Cloud-Hook-URL'
 
 WEBHOOK_TYPE_CALL_SERVICE = 'call_service'
 WEBHOOK_TYPE_FIRE_EVENT = 'fire_event'
+WEBHOOK_TYPE_REGISTER_SENSOR = 'register_sensor'
 WEBHOOK_TYPE_RENDER_TEMPLATE = 'render_template'
 WEBHOOK_TYPE_UPDATE_LOCATION = 'update_location'
 WEBHOOK_TYPE_UPDATE_REGISTRATION = 'update_registration'
-WEBHOOK_TYPE_UPDATE_SENSOR = 'update_sensor'
+WEBHOOK_TYPE_UPDATE_SENSOR_STATES = 'update_sensor_states'
 
 WEBHOOK_TYPES = [WEBHOOK_TYPE_CALL_SERVICE, WEBHOOK_TYPE_FIRE_EVENT,
-                 WEBHOOK_TYPE_RENDER_TEMPLATE, WEBHOOK_TYPE_UPDATE_LOCATION,
-                 WEBHOOK_TYPE_UPDATE_REGISTRATION, WEBHOOK_TYPE_UPDATE_SENSOR]
+                 WEBHOOK_TYPE_REGISTER_SENSOR, WEBHOOK_TYPE_RENDER_TEMPLATE,
+                 WEBHOOK_TYPE_UPDATE_LOCATION,
+                 WEBHOOK_TYPE_UPDATE_REGISTRATION,
+                 WEBHOOK_TYPE_UPDATE_SENSOR_STATES]
 
 REGISTER_DEVICE_SCHEMA = vol.Schema({
     vol.Optional(ATTR_APP_COMPONENT): cv.string,
@@ -92,7 +95,7 @@ UPDATE_DEVICE_SCHEMA = vol.Schema({
 
 WEBHOOK_PAYLOAD_SCHEMA = vol.Schema({
     vol.Required(ATTR_WEBHOOK_TYPE): cv.string,  # vol.In(WEBHOOK_TYPES)
-    vol.Required(ATTR_WEBHOOK_DATA, default={}): dict,
+    vol.Required(ATTR_WEBHOOK_DATA, default={}): vol.Any(dict, list),
     vol.Optional(ATTR_WEBHOOK_ENCRYPTED, default=False): cv.boolean,
     vol.Optional(ATTR_WEBHOOK_ENCRYPTED_DATA): cv.string,
 })
@@ -139,7 +142,7 @@ SENSOR_TYPES = [ATTR_SENSOR_TYPE_BINARY_SENSOR, ATTR_SENSOR_TYPE_SENSOR]
 
 COMBINED_CLASSES = sorted(set(BINARY_SENSOR_CLASSES + SENSOR_CLASSES))
 
-UPDATE_SENSOR_SCHEMA = vol.Schema({
+REGISTER_SENSOR_SCHEMA = vol.Schema({
     vol.Optional(ATTR_SENSOR_ATTRIBUTES, default={}): dict,
     vol.Optional(ATTR_SENSOR_DEVICE_CLASS): vol.All(vol.Lower,
                                                     vol.In(COMBINED_CLASSES)),
@@ -151,13 +154,22 @@ UPDATE_SENSOR_SCHEMA = vol.Schema({
     vol.Optional(ATTR_SENSOR_ICON, default='mdi:cellphone'): cv.icon,
 })
 
+UPDATE_SENSOR_STATE_SCHEMA = vol.All(cv.ensure_list, [vol.Schema({
+    vol.Optional(ATTR_SENSOR_ATTRIBUTES, default={}): dict,
+    vol.Optional(ATTR_SENSOR_ICON, default='mdi:cellphone'): cv.icon,
+    vol.Required(ATTR_SENSOR_STATE): vol.Any(bool, str, int, float),
+    vol.Required(ATTR_SENSOR_TYPE): vol.In(SENSOR_TYPES),
+    vol.Required(ATTR_SENSOR_UNIQUE_ID): cv.string,
+})])
+
 WEBHOOK_SCHEMAS = {
     WEBHOOK_TYPE_CALL_SERVICE: CALL_SERVICE_SCHEMA,
     WEBHOOK_TYPE_FIRE_EVENT: FIRE_EVENT_SCHEMA,
+    WEBHOOK_TYPE_REGISTER_SENSOR: REGISTER_SENSOR_SCHEMA,
     WEBHOOK_TYPE_RENDER_TEMPLATE: RENDER_TEMPLATE_SCHEMA,
     WEBHOOK_TYPE_UPDATE_LOCATION: UPDATE_LOCATION_SCHEMA,
     WEBHOOK_TYPE_UPDATE_REGISTRATION: UPDATE_DEVICE_SCHEMA,
-    WEBHOOK_TYPE_UPDATE_SENSOR: UPDATE_SENSOR_SCHEMA,
+    WEBHOOK_TYPE_UPDATE_SENSOR_STATES: UPDATE_SENSOR_STATE_SCHEMA,
 }
 
 SIGNAL_SENSOR_UPDATE = DOMAIN + '_sensor_update'

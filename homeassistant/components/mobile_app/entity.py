@@ -22,7 +22,8 @@ class MobileAppEntity(Entity):
         self._config = config
         self._device = device
         self._device_id = device[CONF_WEBHOOK_ID]
-        self._sensor_id = config[ATTR_SENSOR_UNIQUE_ID]
+        self._sensor_id = "{}_{}".format(device[CONF_WEBHOOK_ID],
+                                         config[ATTR_SENSOR_UNIQUE_ID])
         self._entity_type = config[ATTR_SENSOR_TYPE]
 
     async def async_added_to_hass(self):
