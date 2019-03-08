@@ -101,8 +101,10 @@ FIRE_EVENT_SCHEMA = vol.Schema({
 })
 
 RENDER_TEMPLATE_SCHEMA = vol.Schema({
-    vol.Required(ATTR_TEMPLATE): cv.string,
-    vol.Optional(ATTR_TEMPLATE_VARIABLES, default={}): dict,
+    str: {
+        vol.Required(ATTR_TEMPLATE): cv.template,
+        vol.Optional(ATTR_TEMPLATE_VARIABLES, default={}): dict,
+    }
 })
 
 UPDATE_LOCATION_SCHEMA = vol.Schema({
