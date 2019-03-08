@@ -39,7 +39,7 @@ from .const import (ATTR_APP_COMPONENT, DATA_DELETED_IDS,
                     WEBHOOK_TYPE_UPDATE_REGISTRATION)
 
 from .helpers import (device_context, _decrypt_payload, empty_okay_response,
-                      safe_device, savable_state)
+                      safe_device, savable_state, webhook_response)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,14 +156,15 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
         try:
             tpl = template.Template(data[ATTR_TEMPLATE], hass)
             rendered = tpl.async_render(data.get(ATTR_TEMPLATE_VARIABLES))
-            return json_response({"rendered": rendered}, headers=headers)
+            return webhook_response({"rendered": rendered}, device=device,
+                                    headers=headers)
         # noqa: E722 pylint: disable=broad-except
         except (ValueError, TemplateError, Exception) as ex:
             _LOGGER.error("Error when rendering template during mobile_app "
                           "webhook (device name: %s): %s",
                           device[ATTR_DEVICE_NAME], ex)
-            return json_response(({"error": ex}), status=HTTP_BAD_REQUEST,
-                                 headers=headers)
+            return webhook_response(({"error": ex}), device=device,
+                                    status=HTTP_BAD_REQUEST, headers=headers)
 
     if webhook_type == WEBHOOK_TYPE_UPDATE_LOCATION:
         try:
@@ -189,4 +190,4 @@ async def handle_webhook(store: Store, hass: HomeAssistantType,
             _LOGGER.error("Error updating mobile_app registration: %s", ex)
             return empty_okay_response()
 
-        return json_response(safe_device(new_device))
+        return webhook_response(safe_device(new_device), device=new_device)
